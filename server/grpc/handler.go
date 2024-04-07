@@ -1,20 +1,25 @@
-package server
+package grpc
 
-import "reflect"
+import (
+	"reflect"
+	"sync"
+)
 
-type GRPCHandler struct {
+var once sync.Once
+
+type Handler struct {
 	name    string
 	handler interface{}
 }
 
-func NewGPRCHandler(handler interface{}, opts ...Option) *GRPCHandler {
+func NewGPRCHandler(handler interface{}, opts ...Option) *Handler {
 	options := Options{
-		Name: DefaultName,
+		name: DefaultName,
 	}
 
 	//typ := reflect.TypeOf(handler)
-	hdlr := reflect.ValueOf(handler)
-	name := reflect.Indirect(hdlr).Type().Name()
+	h := reflect.ValueOf(handler)
+	name := reflect.Indirect(h).Type().Name()
 
 	for _, o := range opts {
 		o(&options)
@@ -32,7 +37,7 @@ func NewGPRCHandler(handler interface{}, opts ...Option) *GRPCHandler {
 	// 	}
 	// }
 
-	return &GRPCHandler{
+	return &Handler{
 		name:    name,
 		handler: handler,
 	}

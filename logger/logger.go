@@ -59,7 +59,6 @@ var (
 
 /**
  * 初始化日志
- *
  **/
 func init() {
 	go func() {
@@ -84,16 +83,15 @@ func init() {
 	}()
 }
 
-/**
+// New
+/*
  * 创建日志文件
- *
- * @param [directoty] string
- *
+ * @param [directory] string
  * @return (error)
- **/
-func New(directoty string) error {
+ */
+func New(directory string) error {
 	contextLogger = logrus.WithFields(logrus.Fields{})
-	logDir = directoty
+	logDir = directory
 	logrus.SetFormatter(&logrus.TextFormatter{
 		DisableTimestamp: true,
 	})
@@ -114,13 +112,12 @@ func New(directoty string) error {
 	return nil
 }
 
-/**
+// SetCallback
+/*
  * 设置日志回调
- *
  * @param [c] func(i LogInfo)
- *
  * @return (error)
- **/
+ */
 func SetCallback(c func(i Logger)) {
 	if cb != nil && c != nil {
 		return
@@ -137,21 +134,18 @@ func SetCallback(c func(i Logger)) {
 	}
 }
 
-/**
+// SetScreenPrint
+/*
  * 日志快照
- *
  * @param [print] int
- *
- **/
+ */
 func SetScreenPrint(print int) {
 	screenPrint = print
 }
 
 /**
  * 当前时间字符串
- *
  * @return (string)
- *
  **/
 func nowTimeString() string {
 	now := time.Now()
@@ -160,12 +154,11 @@ func nowTimeString() string {
 	return timeStr
 }
 
-/**
+// TryE
+/*
  * 日志异常捕捉
- *
  * @param [pathName] string
- *
- **/
+ */
 func TryE(pathName string) {
 	errs := recover()
 	if errs == nil {
@@ -189,7 +182,6 @@ func TryE(pathName string) {
 
 /**
  * 日志输出
- *
  * @param [classname] 类名
  * @param [file] 文件
  * @param [format] 格式
@@ -258,73 +250,73 @@ func printLog(classname, file, format string, line, level int, a ...interface{})
 	}
 }
 
-/**
+// Trace
+/*
  * 追踪级别
- *
  * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
- **/
+ */
 func Trace(classname, format string, a ...interface{}) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, TraceLevel, a...)
 }
 
-/**
+// Debug
+/*
  * 调试级别
- *
  * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
- **/
+ */
 func Debug(classname, format string, a ...interface{}) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, DebugLevel, a...)
 }
 
-/**
+// Info
+/*
  * 正常级别
- *
  * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
- **/
+ */
 func Info(classname, format string, a ...interface{}) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, InfoLevel, a...)
 }
 
-/**
+// Warning
+/*
  * 警告级别
- *
  * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
- **/
+ */
 func Warning(classname, format string, a ...interface{}) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, WarningLevel, a...)
 }
 
-/**
+// Error
+/*
  * 错误级别
- *
  * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
- **/
+ */
 func Error(classname, format string, a ...interface{}) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, ErrorLevel, a...)
 }
 
-/**
+// Fatal
+/*
  * 失败级别
- *
  * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
- **/
+ */
 func Fatal(classname, format string, a ...interface{}) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, FatalLevel, a...)
@@ -332,13 +324,12 @@ func Fatal(classname, format string, a ...interface{}) {
 	os.Exit(1)
 }
 
-/**
+// GetLogLevelStr
+/*
  * 获取日志等级
- *
  * @param [level] int
- *
  * @return (string)
- **/
+ */
 func GetLogLevelStr(level int) string {
 	if _, ok := levelName[level]; ok {
 		return levelName[level]

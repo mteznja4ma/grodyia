@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package message;
+
+option go_package = "../internal/servers";
+
+enum ServerState {
+  Waiting = 0; // 等待 - 不可发现
+  Running = 1; // 运行 - 可发现
+  Close   = 2; // 关闭 - 不可发现
+  Full    = 3; // 满载 - 可发现(不可进入)
+}
+
+message ServerData {
+  string      id           = 1;    // 服务ID
+  string      name         = 2;    // 服务名称
+  string      socket       = 3;    // 服务长连接地址
+  string      http         = 4;    // 服务短链接
+  ServerState state        = 5;    // 服务状态
+}

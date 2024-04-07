@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package rpc;
+
+option go_package = "../internal/rpc";
+
+import "message.proto";
+
+// 服务间短链接调用
+service Command {
+  rpc Handle(message.ServiceCall) returns (message.ServiceReturn) {};
+}
+
+// 服务间长链接调用
+service Connect {
+  rpc Exec(message.BaseMessage) returns (message.BaseMessage) {};
+  rpc Link(stream message.BaseMessage) returns (stream message.BaseMessage) {};
+}

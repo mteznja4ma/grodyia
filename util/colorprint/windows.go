@@ -33,12 +33,12 @@ type Color struct {
 	White       int // 白色
 }
 
-/**
+// ColorPrint
+/*
  * 颜色输出
- *
  * @param [s] string
  * @param [i] int
- **/
+ */
 func ColorPrint(s string, i int) {
 	handle, _, _ := proc.Call(uintptr(syscall.Stdout), uintptr(i))
 	print(s)
