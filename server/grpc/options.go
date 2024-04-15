@@ -1,6 +1,9 @@
 package grpc
 
-import "grodyia/logger"
+import (
+	"google.golang.org/grpc"
+	"grodyia/logger"
+)
 
 type Options struct {
 	Logger logger.Logger
@@ -11,8 +14,9 @@ type Options struct {
 
 	// service
 	address        string
-	port           int
 	maxCurrentConn uint32
+
+	grpcOptions []grpc.ServerOption
 }
 
 func (o Options) GetName() string {
@@ -23,10 +27,10 @@ func (o Options) GetAddress() string {
 	return o.address
 }
 
-func (o Options) GetPort() int {
-	return o.port
-}
-
 func (o Options) GetMaxCurrentConn() uint32 {
 	return o.maxCurrentConn
+}
+
+func (o Options) GetGrpcOptions() []grpc.ServerOption {
+	return o.grpcOptions
 }

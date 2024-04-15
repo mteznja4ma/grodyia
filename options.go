@@ -1,4 +1,4 @@
-package Grodyia
+package grodyia
 
 import "grodyia/logger"
 

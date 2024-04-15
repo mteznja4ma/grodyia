@@ -8,7 +8,7 @@ import "message.proto";
 
 // 服务间短链接调用
 service Command {
-  rpc Handle(message.ServiceCall) returns (message.ServiceReturn) {};
+  rpc Exec(message.Invocation) returns (message.Return) {};
 }
 
 // 服务间长链接调用

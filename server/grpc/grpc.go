@@ -1,27 +1,21 @@
 package grpc
 
 import (
-	"context"
-	"fmt"
 	"google.golang.org/grpc"
-	"grodyia/internal/message"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"grodyia/internal/rpc"
-	"grodyia/logger"
 	"net"
-	"os"
-	"runtime/debug"
 )
 
 type grpcService struct {
-	rpc.UnimplementedCommandServer
+	*baseRpcService
+	rpc.UnimplementedConnectServer
 	options Options
 }
 
 func NewGRPCServer(opts ...Option) Service {
 	g := &grpcService{}
-	g.options = Options{
-		name: DefaultName,
-	}
+	g.options = Options{}
 	for _, o := range opts {
 		o(&g.options)
 	}
@@ -36,34 +30,33 @@ func (g *grpcService) Options() Options {
 	return g.Options()
 }
 
-func (g *grpcService) Start() error {
-	ln, err := net.Listen("tcp", fmt.Sprintf("%v:%d", g.Options().GetAddress(), g.Options().GetPort()))
+func (g *grpcService) Start(register RegisterFn) error {
+	ln, err := net.Listen("tcp", g.Options().GetAddress())
 	if err != nil {
-		logger.Fatal("grpc", "%v", err)
+		return err
 	}
-	s := grpc.NewServer(
-		grpc.MaxConcurrentStreams(g.Options().GetMaxCurrentConn()),
-	)
-	rpc.RegisterCommandServer(s, g)
-	logger.Info("grpc", "server[%v] start success, listening at %v:%d", g.Options().GetName(), g.Options().GetAddress(), g.Options().GetPort())
-	if err := s.Serve(ln); err != nil {
-		logger.Fatal("grpc", "%v", err)
-	}
-	return nil
-}
 
-func (g *grpcService) Call(ctx context.Context, cmd *message.ServiceCall) (*message.ServiceReturn, error) {
+	//unaryInterceptorOption := grpc.ChainUnaryInterceptor(g.buildUnaryInterceptors()...)
+	//streamInterceptorOption := grpc.ChainStreamInterceptor(g.buildStreamInterceptors()...)
+	//
+	//options := append(g.Options().GetGrpcOptions(), unaryInterceptorOption, streamInterceptorOption)
+
+	s := grpc.NewServer(g.Options().GetGrpcOptions()...)
+	register(s)
+
+	// register the health check service
+	if g.health != nil {
+		grpc_health_v1.RegisterHealthServer(s, g.health)
+		g.health.Resume()
+	}
+	//g.healthManager.MarkReady()
+	//health.AddProbe(s.healthManager)
+
 	defer func() {
-		if err := recover(); err != nil {
-			logger.Error("grpc", "call service[%v] panic: %v", cmd, err)
-			stack := debug.Stack()
-			if _, err := os.Stderr.Write(stack); err != nil {
-				logger.Error("grpc", "call service[%v] stack write error: %v", cmd, err)
-			}
-		}
+		s.GracefulStop()
 	}()
-	// msg, err :=
-	return nil, nil
+
+	return s.Serve(ln)
 }
 
 func (g *grpcService) Stop() error {

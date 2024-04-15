@@ -13,9 +13,7 @@ type Handler struct {
 }
 
 func NewGPRCHandler(handler interface{}, opts ...Option) *Handler {
-	options := Options{
-		name: DefaultName,
-	}
+	options := Options{}
 
 	//typ := reflect.TypeOf(handler)
 	h := reflect.ValueOf(handler)

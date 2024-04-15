@@ -1,30 +1,34 @@
 package grpc
 
 import (
-	"context"
-	"github.com/google/uuid"
-	"grodyia/internal/message"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
 )
 
-var (
-	DefaultAddress         = ":0"
-	DefaultName            = "grodyia"
-	DefaultVersion         = "latest"
-	DefaultId              = uuid.New().String()
-	DefaultServer  Service = NewGRPCServer()
+type (
+	// RegisterFn defines the method to register a server.
+	RegisterFn func(*grpc.Server)
+
+	Option func(*Options)
+
+	Service interface {
+		// Init Options
+		Init(opts ...Option) error
+		// Options Get
+		Options() Options
+		// Start the Service
+		Start(register RegisterFn) error
+		// Stop the Service
+		Stop() error
+		// Handler the Service
+		// Handler(ctx context.Context, cmd *message.Invocation) (*message.Return, error)
+	}
+
+	baseRpcService struct {
+		options            Options
+		grpcOptions        []grpc.ServerOption
+		health             *health.Server
+		streamInterceptors []grpc.StreamServerInterceptor
+		unaryInterceptors  []grpc.UnaryServerInterceptor
+	}
 )
-
-type Option func(*Options)
-
-type Service interface {
-	// Intialize Options
-	Init(opts ...Option) error
-	// Retrieve Options
-	Options() Options
-	// Start the Service
-	Start() error
-	// Stop the Service
-	Stop() error
-	// Call the Service
-	Call(ctx context.Context, cmd *message.ServiceCall) (*message.ServiceReturn, error)
-}
