@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"grodyia/health"
 	"grodyia/logger"
@@ -98,13 +97,11 @@ func (s *Server) Stop(ctx context.Context) error {
 	logger.Info("http", "HTTP server stopping...")
 	s.healthStatus.SetNoReady()
 
-	shutdownCtx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
-
-	if err := s.server.Shutdown(shutdownCtx); err != nil {
-		logger.Warning("http", "Server force stopping")
+	if err := s.server.Shutdown(ctx); err != nil {
+		logger.Warning("http", "Shutdown error: %v, forcing close", err)
 		return s.server.Close()
 	}
+	logger.Info("http", "HTTP server stopped")
 
 	return nil
 }

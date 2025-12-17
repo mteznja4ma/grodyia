@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -26,7 +25,8 @@ type Server struct {
 	onDisconnect   func(*Connection)
 	messageHandler MessageHandler
 
-	addr string
+	addr     string
+	stopping bool // 是否正在停止
 }
 
 // NewServer 创建新的 WebSocket 服务器
@@ -118,25 +118,45 @@ func (s *Server) Stop(ctx context.Context) error {
 	logger.Info("ws", "WebSocket server stopping...")
 	s.healthStatus.SetNoReady()
 
-	// 关闭所有连接
+	// 设置停止标志，拒绝新连接
 	s.mu.Lock()
+	s.stopping = true
+	s.mu.Unlock()
+
+	// 复制连接列表，避免在持有锁时调用 Close 导致死锁
+	s.mu.Lock()
+	conns := make([]*Connection, 0, len(s.connections))
 	for _, conn := range s.connections {
-		conn.Close()
+		conns = append(conns, conn)
 	}
 	s.connections = make(map[string]*Connection)
 	s.mu.Unlock()
 
-	shutdownCtx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
+	// 在锁外关闭所有连接
+	for _, conn := range conns {
+		conn.Close()
+	}
 
-	if err := s.server.Shutdown(shutdownCtx); err != nil {
+	if err := s.server.Shutdown(ctx); err != nil {
+		logger.Warning("ws", "Shutdown error: %v, forcing close", err)
 		return s.server.Close()
 	}
+	logger.Info("ws", "WebSocket server stopped")
 
 	return nil
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// 检查服务器是否正在停止
+	s.mu.RLock()
+	stopping := s.stopping
+	s.mu.RUnlock()
+
+	if stopping {
+		http.Error(w, "Server is shutting down", http.StatusServiceUnavailable)
+		return
+	}
+
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Warning("ws", "Upgrade failed: %v", err)
@@ -194,7 +214,7 @@ func (s *Server) GetConnection(id string) (*Connection, bool) {
 }
 
 // Broadcast 广播消息
-func (s *Server) Broadcast(data interface{}) error {
+func (s *Server) Broadcast(data any) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -208,7 +228,7 @@ func (s *Server) Broadcast(data interface{}) error {
 }
 
 // BroadcastExcept 广播消息 (排除指定连接)
-func (s *Server) BroadcastExcept(data interface{}, excludeIDs ...string) error {
+func (s *Server) BroadcastExcept(data any, excludeIDs ...string) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

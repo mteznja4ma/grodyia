@@ -16,13 +16,13 @@ type Client interface {
 	// Options returns the client options
 	Options() Options
 	// Get performs a GET request
-	Get(ctx context.Context, path string, result interface{}) error
+	Get(ctx context.Context, path string, result any) error
 	// Post performs a POST request
-	Post(ctx context.Context, path string, body, result interface{}) error
+	Post(ctx context.Context, path string, body, result any) error
 	// Put performs a PUT request
-	Put(ctx context.Context, path string, body, result interface{}) error
+	Put(ctx context.Context, path string, body, result any) error
 	// Delete performs a DELETE request
-	Delete(ctx context.Context, path string, result interface{}) error
+	Delete(ctx context.Context, path string, result any) error
 	// Do performs a custom request
 	Do(ctx context.Context, method, path string, body []byte) ([]byte, int, error)
 }
@@ -51,7 +51,7 @@ func (c *client) Options() Options {
 	return c.opts
 }
 
-func (c *client) Get(ctx context.Context, path string, result interface{}) error {
+func (c *client) Get(ctx context.Context, path string, result any) error {
 	data, _, err := c.Do(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func (c *client) Get(ctx context.Context, path string, result interface{}) error
 	return nil
 }
 
-func (c *client) Post(ctx context.Context, path string, body, result interface{}) error {
+func (c *client) Post(ctx context.Context, path string, body, result any) error {
 	bodyData, err := c.opts.Codec.Marshal(body)
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func (c *client) Post(ctx context.Context, path string, body, result interface{}
 	return nil
 }
 
-func (c *client) Put(ctx context.Context, path string, body, result interface{}) error {
+func (c *client) Put(ctx context.Context, path string, body, result any) error {
 	bodyData, err := c.opts.Codec.Marshal(body)
 	if err != nil {
 		return err
@@ -94,7 +94,7 @@ func (c *client) Put(ctx context.Context, path string, body, result interface{})
 	return nil
 }
 
-func (c *client) Delete(ctx context.Context, path string, result interface{}) error {
+func (c *client) Delete(ctx context.Context, path string, result any) error {
 	data, _, err := c.Do(ctx, http.MethodDelete, path, nil)
 	if err != nil {
 		return err

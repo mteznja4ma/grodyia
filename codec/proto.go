@@ -18,7 +18,7 @@ func (c *ProtoCodec) Name() string {
 	return "proto"
 }
 
-func (c *ProtoCodec) Marshal(v interface{}) ([]byte, error) {
+func (c *ProtoCodec) Marshal(v any) ([]byte, error) {
 	msg, ok := v.(proto.Message)
 	if !ok {
 		return nil, errors.New("proto codec: value must implement proto.Message")
@@ -26,7 +26,7 @@ func (c *ProtoCodec) Marshal(v interface{}) ([]byte, error) {
 	return proto.Marshal(msg)
 }
 
-func (c *ProtoCodec) Unmarshal(data []byte, v interface{}) error {
+func (c *ProtoCodec) Unmarshal(data []byte, v any) error {
 	msg, ok := v.(proto.Message)
 	if !ok {
 		return errors.New("proto codec: target must implement proto.Message")
@@ -37,4 +37,3 @@ func (c *ProtoCodec) Unmarshal(data []byte, v interface{}) error {
 func (c *ProtoCodec) ContentType() string {
 	return "application/x-protobuf"
 }
-

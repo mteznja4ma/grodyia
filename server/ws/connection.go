@@ -58,7 +58,7 @@ func newConnection(id string, conn *websocket.Conn, codec codec.Codec, server *S
 }
 
 // Send sends a message to the connection
-func (c *Connection) Send(data interface{}) error {
+func (c *Connection) Send(data any) error {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()

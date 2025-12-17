@@ -41,7 +41,7 @@ type Client interface {
 	// IsConnected returns true if connected
 	IsConnected() bool
 	// Send sends a message
-	Send(data interface{}) error
+	Send(data any) error
 	// SendRaw sends raw bytes
 	SendRaw(data []byte) error
 	// OnMessage sets message handler
@@ -53,19 +53,19 @@ type Client interface {
 }
 
 type client struct {
-	opts          Options
-	conn          *websocket.Conn
-	dialer        *websocket.Dialer
-	mu            sync.RWMutex
-	send          chan []byte
-	done          chan struct{}
-	closed        bool
-	connected     bool
-	reconnecting  bool
+	opts           Options
+	conn           *websocket.Conn
+	dialer         *websocket.Dialer
+	mu             sync.RWMutex
+	send           chan []byte
+	done           chan struct{}
+	closed         bool
+	connected      bool
+	reconnecting   bool
 	reconnectCount int
-	onMessage     MessageHandler
-	onConnect     func()
-	onDisconnect  func(error)
+	onMessage      MessageHandler
+	onConnect      func()
+	onDisconnect   func(error)
 }
 
 // NewClient creates a new WebSocket client
@@ -171,7 +171,7 @@ func (c *client) IsConnected() bool {
 	return c.connected
 }
 
-func (c *client) Send(data interface{}) error {
+func (c *client) Send(data any) error {
 	c.mu.RLock()
 	if !c.connected {
 		c.mu.RUnlock()
@@ -387,4 +387,3 @@ func Dial(ctx context.Context, url string, opts ...Option) (Client, error) {
 	}
 	return c, nil
 }
-

@@ -17,7 +17,7 @@ func (c *RawCodec) Name() string {
 	return "raw"
 }
 
-func (c *RawCodec) Marshal(v interface{}) ([]byte, error) {
+func (c *RawCodec) Marshal(v any) ([]byte, error) {
 	switch val := v.(type) {
 	case []byte:
 		return val, nil
@@ -33,7 +33,7 @@ func (c *RawCodec) Marshal(v interface{}) ([]byte, error) {
 	}
 }
 
-func (c *RawCodec) Unmarshal(data []byte, v interface{}) error {
+func (c *RawCodec) Unmarshal(data []byte, v any) error {
 	switch val := v.(type) {
 	case *[]byte:
 		*val = data
@@ -49,4 +49,3 @@ func (c *RawCodec) Unmarshal(data []byte, v interface{}) error {
 func (c *RawCodec) ContentType() string {
 	return "application/octet-stream"
 }
-

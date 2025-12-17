@@ -59,7 +59,7 @@ func (c *Context) Body() ([]byte, error) {
 }
 
 // Bind decodes the request body into v
-func (c *Context) Bind(v interface{}) error {
+func (c *Context) Bind(v any) error {
 	body, err := c.Body()
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (c *Context) Bind(v interface{}) error {
 }
 
 // JSON sends a JSON response
-func (c *Context) JSON(code int, v interface{}) error {
+func (c *Context) JSON(code int, v any) error {
 	c.Response.Header().Set("Content-Type", "application/json")
 	c.Response.WriteHeader(code)
 
@@ -98,7 +98,7 @@ func (c *Context) String(code int, s string) error {
 
 // Error sends an error response
 func (c *Context) Error(code int, message string) error {
-	return c.JSON(code, map[string]interface{}{
+	return c.JSON(code, map[string]any{
 		"error": message,
 		"code":  code,
 	})

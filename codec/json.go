@@ -16,15 +16,14 @@ func (c *JSONCodec) Name() string {
 	return "json"
 }
 
-func (c *JSONCodec) Marshal(v interface{}) ([]byte, error) {
+func (c *JSONCodec) Marshal(v any) ([]byte, error) {
 	return json.Marshal(v)
 }
 
-func (c *JSONCodec) Unmarshal(data []byte, v interface{}) error {
+func (c *JSONCodec) Unmarshal(data []byte, v any) error {
 	return json.Unmarshal(data, v)
 }
 
 func (c *JSONCodec) ContentType() string {
 	return "application/json"
 }
-

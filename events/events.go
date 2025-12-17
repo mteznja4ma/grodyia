@@ -13,7 +13,7 @@ type Event struct {
 	// Type is the event type
 	Type string
 	// Data is the event payload (protocol agnostic)
-	Data interface{}
+	Data any
 	// Timestamp when the event was created
 	Timestamp time.Time
 	// Metadata for additional info
@@ -26,7 +26,7 @@ type Handler func(context.Context, *Event) error
 // Bus is the event bus interface
 type Bus interface {
 	// Publish publishes an event
-	Publish(ctx context.Context, topic string, data interface{}) error
+	Publish(ctx context.Context, topic string, data any) error
 	// Subscribe subscribes to a topic
 	Subscribe(topic string, handler Handler) (Subscription, error)
 	// Close closes the event bus
@@ -77,7 +77,7 @@ func NewBus(opts ...Option) Bus {
 	}
 }
 
-func (b *eventBus) Publish(ctx context.Context, topic string, data interface{}) error {
+func (b *eventBus) Publish(ctx context.Context, topic string, data any) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -176,7 +176,7 @@ func (b *eventBus) Close() error {
 }
 
 // NewEvent creates a new event
-func NewEvent(topic string, data interface{}) *Event {
+func NewEvent(topic string, data any) *Event {
 	return &Event{
 		Topic:     topic,
 		Data:      data,

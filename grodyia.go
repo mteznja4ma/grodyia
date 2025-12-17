@@ -268,7 +268,7 @@ func (a *App) Start() error {
 	}
 
 	// 发布启动事件
-	a.eventBus.Publish(a.ctx, "app.started", map[string]interface{}{
+	a.eventBus.Publish(a.ctx, "app.started", map[string]any{
 		"name":    a.opts.Name,
 		"id":      a.opts.ID,
 		"version": a.opts.Version,
@@ -287,6 +287,11 @@ func (a *App) Start() error {
 
 // Stop 停止应用
 func (a *App) Stop() error {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error(a.opts.Name, "Panic during application stop: %v", r)
+		}
+	}()
 	a.mu.Lock()
 	if !a.running {
 		a.mu.Unlock()
@@ -332,9 +337,9 @@ func (a *App) Stop() error {
 	}
 
 	// 关闭事件总线
-	a.eventBus.Close()
+	// a.eventBus.Close()
 
-	// 取消上下文
+	// 取消应用上下文
 	a.cancel()
 
 	// 执行停止后钩子
@@ -349,7 +354,7 @@ func (a *App) Stop() error {
 }
 
 // Publish 发布事件
-func (a *App) Publish(topic string, data interface{}) error {
+func (a *App) Publish(topic string, data any) error {
 	return a.eventBus.Publish(a.ctx, topic, data)
 }
 

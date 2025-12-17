@@ -6,21 +6,21 @@ type Codec interface {
 	// Name returns the codec name
 	Name() string
 	// Marshal encodes a value to bytes
-	Marshal(v interface{}) ([]byte, error)
+	Marshal(v any) ([]byte, error)
 	// Unmarshal decodes bytes to a value
-	Unmarshal(data []byte, v interface{}) error
+	Unmarshal(data []byte, v any) error
 	// ContentType returns the MIME type
 	ContentType() string
 }
 
 // Reader is a codec that can read from a stream
 type Reader interface {
-	Read(interface{}) error
+	Read(any) error
 }
 
 // Writer is a codec that can write to a stream
 type Writer interface {
-	Write(interface{}) error
+	Write(any) error
 }
 
 // ReadWriteCloser combines Reader, Writer and io.Closer
@@ -29,4 +29,3 @@ type ReadWriteCloser interface {
 	Writer
 	Close() error
 }
-

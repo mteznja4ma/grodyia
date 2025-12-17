@@ -14,7 +14,7 @@ type Config interface {
 	// Load loads the configuration
 	Load() error
 	// Get returns a value by key (supports dot notation)
-	Get(key string) interface{}
+	Get(key string) any
 	// GetString returns a string value
 	GetString(key string) string
 	// GetInt returns an int value
@@ -24,16 +24,16 @@ type Config interface {
 	// GetStringSlice returns a string slice
 	GetStringSlice(key string) []string
 	// Set sets a value
-	Set(key string, value interface{})
+	Set(key string, value any)
 	// All returns all configuration
-	All() map[string]interface{}
+	All() map[string]any
 	// Unmarshal unmarshals config into a struct
-	Unmarshal(v interface{}) error
+	Unmarshal(v any) error
 }
 
 type config struct {
 	opts Options
-	data map[string]interface{}
+	data map[string]any
 	mu   sync.RWMutex
 }
 
@@ -46,7 +46,7 @@ func New(opts ...Option) Config {
 
 	return &config{
 		opts: options,
-		data: make(map[string]interface{}),
+		data: make(map[string]any),
 	}
 }
 
@@ -70,7 +70,7 @@ func (c *config) loadFromFile() error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Create default empty config
-			c.data = make(map[string]interface{})
+			c.data = make(map[string]any)
 			return nil
 		}
 		return err
@@ -86,7 +86,7 @@ func (c *config) loadFromFile() error {
 }
 
 func (c *config) loadFromEnv() error {
-	c.data = make(map[string]interface{})
+	c.data = make(map[string]any)
 	for _, env := range os.Environ() {
 		parts := strings.SplitN(env, "=", 2)
 		if len(parts) == 2 {
@@ -98,16 +98,16 @@ func (c *config) loadFromEnv() error {
 }
 
 // Get returns a value by key using dot notation
-func (c *config) Get(key string) interface{} {
+func (c *config) Get(key string) any {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	parts := strings.Split(key, ".")
-	var current interface{} = c.data
+	var current any = c.data
 
 	for _, part := range parts {
 		switch v := current.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			current = v[part]
 		default:
 			return nil
@@ -165,7 +165,7 @@ func (c *config) GetStringSlice(key string) []string {
 	if v == nil {
 		return nil
 	}
-	if arr, ok := v.([]interface{}); ok {
+	if arr, ok := v.([]any); ok {
 		result := make([]string, 0, len(arr))
 		for _, item := range arr {
 			if s, ok := item.(string); ok {
@@ -178,7 +178,7 @@ func (c *config) GetStringSlice(key string) []string {
 }
 
 // Set sets a value
-func (c *config) Set(key string, value interface{}) {
+func (c *config) Set(key string, value any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -188,9 +188,9 @@ func (c *config) Set(key string, value interface{}) {
 	for i := 0; i < len(parts)-1; i++ {
 		part := parts[i]
 		if _, ok := current[part]; !ok {
-			current[part] = make(map[string]interface{})
+			current[part] = make(map[string]any)
 		}
-		if next, ok := current[part].(map[string]interface{}); ok {
+		if next, ok := current[part].(map[string]any); ok {
 			current = next
 		}
 	}
@@ -199,19 +199,19 @@ func (c *config) Set(key string, value interface{}) {
 }
 
 // All returns all configuration
-func (c *config) All() map[string]interface{} {
+func (c *config) All() map[string]any {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	// Deep copy
-	result := make(map[string]interface{})
+	result := make(map[string]any)
 	data, _ := json.Marshal(c.data)
 	json.Unmarshal(data, &result)
 	return result
 }
 
 // Unmarshal unmarshals config into a struct
-func (c *config) Unmarshal(v interface{}) error {
+func (c *config) Unmarshal(v any) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 

@@ -142,7 +142,7 @@ func (s *Server) buildStreamInterceptors() []grpc.StreamServerInterceptor {
 }
 
 func (s *Server) recoveryInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				logger.Error("grpc", "Panic recovered: %v", r)
@@ -154,7 +154,7 @@ func (s *Server) recoveryInterceptor() grpc.UnaryServerInterceptor {
 }
 
 func (s *Server) loggingInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		start := time.Now()
 		resp, err := handler(ctx, req)
 		duration := time.Since(start)
@@ -170,7 +170,7 @@ func (s *Server) loggingInterceptor() grpc.UnaryServerInterceptor {
 }
 
 func (s *Server) streamRecoveryInterceptor() grpc.StreamServerInterceptor {
-	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				logger.Error("grpc", "Stream panic recovered: %v", r)

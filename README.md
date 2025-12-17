@@ -281,7 +281,7 @@ func main() {
     })
 
     gameServer.OnMessage(func(ctx context.Context, msg *ws.Message) error {
-        var req map[string]interface{}
+        var req map[string]any
         json.Unmarshal(msg.Data, &req)
 
         switch req["type"] {

@@ -190,7 +190,7 @@ func TryE(pathName string) {
  * @param [a] 参数
  *
  **/
-func printLog(classname, file, format string, line, level int, a ...interface{}) {
+func printLog(classname, file, format string, line, level int, a ...any) {
 	dir, _ := util.GetCurrentPath()
 	dir = path.Join(dir, "log")
 	if contextLogger != nil {
@@ -257,7 +257,7 @@ func printLog(classname, file, format string, line, level int, a ...interface{})
  * @param [format] 格式
  * @param [a] 参数
  */
-func Trace(classname, format string, a ...interface{}) {
+func Trace(classname, format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, TraceLevel, a...)
 }
@@ -269,7 +269,7 @@ func Trace(classname, format string, a ...interface{}) {
  * @param [format] 格式
  * @param [a] 参数
  */
-func Debug(classname, format string, a ...interface{}) {
+func Debug(classname, format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, DebugLevel, a...)
 }
@@ -281,7 +281,7 @@ func Debug(classname, format string, a ...interface{}) {
  * @param [format] 格式
  * @param [a] 参数
  */
-func Info(classname, format string, a ...interface{}) {
+func Info(classname, format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, InfoLevel, a...)
 }
@@ -293,7 +293,7 @@ func Info(classname, format string, a ...interface{}) {
  * @param [format] 格式
  * @param [a] 参数
  */
-func Warning(classname, format string, a ...interface{}) {
+func Warning(classname, format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, WarningLevel, a...)
 }
@@ -305,7 +305,7 @@ func Warning(classname, format string, a ...interface{}) {
  * @param [format] 格式
  * @param [a] 参数
  */
-func Error(classname, format string, a ...interface{}) {
+func Error(classname, format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, ErrorLevel, a...)
 }
@@ -317,7 +317,7 @@ func Error(classname, format string, a ...interface{}) {
  * @param [format] 格式
  * @param [a] 参数
  */
-func Fatal(classname, format string, a ...interface{}) {
+func Fatal(classname, format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
 	printLog(classname, file, format, line, FatalLevel, a...)
 	time.Sleep(time.Second / 2)

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐍 Snake Battle - 蛇蛇大作战</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #e94560;
+        }
+        
+        .container {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #e94560, 0 0 20px #e94560;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from { text-shadow: 0 0 10px #e94560, 0 0 20px #e94560; }
+            to { text-shadow: 0 0 20px #e94560, 0 0 40px #e94560, 0 0 60px #e94560; }
+        }
+        
+        #game-canvas {
+            border: 4px solid #e94560;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(233, 69, 96, 0.5);
+            background: #0a0a0f;
+            display: none;
+        }
+        
+        .menu {
+            background: rgba(0, 0, 0, 0.7);
+            border: 3px solid #e94560;
+            border-radius: 15px;
+            padding: 40px;
+            max-width: 500px;
+        }
+        
+        .btn {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            padding: 15px 30px;
+            margin: 10px;
+            border: 3px solid #e94560;
+            border-radius: 8px;
+            background: transparent;
+            color: #e94560;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: #e94560;
+            color: #1a1a2e;
+            transform: scale(1.05);
+            box-shadow: 0 0 20px #e94560;
+        }
+        
+        .status {
+            font-size: 0.8rem;
+            margin: 20px 0;
+            color: #00ff88;
+        }
+        
+        .waiting {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            50% { opacity: 0.5; }
+        }
+        
+        .score-board {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 15px;
+            font-size: 0.7rem;
+        }
+        
+        .player-score {
+            padding: 10px 20px;
+            border-radius: 8px;
+            min-width: 150px;
+        }
+        
+        .player1 {
+            background: rgba(0, 255, 136, 0.2);
+            border: 2px solid #00ff88;
+            color: #00ff88;
+        }
+        
+        .player2 {
+            background: rgba(255, 165, 0, 0.2);
+            border: 2px solid #ffa500;
+            color: #ffa500;
+        }
+        
+        .game-over {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        
+        .game-over h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            animation: glow 1s ease-in-out infinite alternate;
+        }
+        
+        .game-over .result {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+        }
+        
+        .controls-hint {
+            font-size: 0.6rem;
+            color: #888;
+            margin-top: 15px;
+        }
+        
+        .room-info {
+            font-size: 0.7rem;
+            color: #888;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐍 SNAKE BATTLE</h1>
+        
+        <!-- 菜单界面 -->
+        <div id="menu" class="menu">
+            <p class="status" id="status">连接服务器中...</p>
+            <button class="btn" id="join-btn" style="display: none;" onclick="joinGame()">
+                开始对战
+            </button>
+            <p class="controls-hint">使用 ↑ ↓ ← → 或 WASD 控制方向</p>
+        </div>
+        
+        <!-- 等待界面 -->
+        <div id="waiting" class="menu" style="display: none;">
+            <p class="status waiting">等待其他玩家加入...</p>
+            <p class="room-info" id="room-info"></p>
+            <button class="btn" onclick="leaveRoom()">取消</button>
+        </div>
+        
+        <!-- 游戏界面 -->
+        <div id="game" style="display: none;">
+            <div class="score-board">
+                <div class="player-score player1">
+                    <div>玩家1 (你)</div>
+                    <div id="score1">0</div>
+                </div>
+                <div class="player-score player2">
+                    <div>玩家2</div>
+                    <div id="score2">0</div>
+                </div>
+            </div>
+            <canvas id="game-canvas"></canvas>
+        </div>
+        
+        <!-- 游戏结束界面 -->
+        <div id="game-over" class="game-over">
+            <h2 id="result-title">游戏结束</h2>
+            <p class="result" id="result-text"></p>
+            <button class="btn" onclick="backToMenu()">返回菜单</button>
+        </div>
+    </div>
+
+    <script>
+        const GRID_WIDTH = 40;
+        const GRID_HEIGHT = 30;
+        const CELL_SIZE = 15;
+        
+        let ws = null;
+        let playerId = null;
+        let roomId = null;
+        let gameState = null;
+        let playerOrder = [];
+        
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = GRID_WIDTH * CELL_SIZE;
+        canvas.height = GRID_HEIGHT * CELL_SIZE;
+        
+        // 连接服务器
+        function connect() {
+            ws = new WebSocket('ws://192.168.117.16:8085/ws');
+            
+            ws.onopen = () => {
+                document.getElementById('status').textContent = '已连接!';
+                document.getElementById('join-btn').style.display = 'inline-block';
+            };
+            
+            ws.onclose = () => {
+                document.getElementById('status').textContent = '连接断开，重连中...';
+                document.getElementById('join-btn').style.display = 'none';
+                setTimeout(connect, 2000);
+            };
+            
+            ws.onerror = () => {
+                document.getElementById('status').textContent = '连接错误';
+            };
+            
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleMessage(msg);
+            };
+        }
+        
+        function handleMessage(msg) {
+            switch (msg.type) {
+                case 'welcome':
+                    playerId = msg.data.player_id;
+                    break;
+                    
+                case 'room_info':
+                    roomId = msg.data.room_id;
+                    document.getElementById('room-info').textContent = 
+                        `房间: ${roomId} | 玩家: ${msg.data.player_count}/2`;
+                    showScreen('waiting');
+                    break;
+                    
+                case 'player_join':
+                    document.getElementById('room-info').textContent = 
+                        `房间: ${roomId} | 玩家: ${msg.data.player_count}/2`;
+                    break;
+                    
+                case 'game_start':
+                    playerOrder = [];
+                    showScreen('game');
+                    break;
+                    
+                case 'state':
+                    gameState = msg.data;
+                    // 记录玩家顺序
+                    if (playerOrder.length === 0) {
+                        for (const id in msg.data.players) {
+                            if (id === playerId) {
+                                playerOrder.unshift(id);
+                            } else {
+                                playerOrder.push(id);
+                            }
+                        }
+                    }
+                    render();
+                    updateScores();
+                    break;
+                    
+                case 'game_end':
+                    gameState = msg.data.state;
+                    render();
+                    showGameOver(msg.data.winner);
+                    break;
+                    
+                case 'player_leave':
+                    showGameOver('opponent_left');
+                    break;
+                    
+                case 'error':
+                    alert(msg.data.message);
+                    break;
+            }
+        }
+        
+        function showScreen(screen) {
+            document.getElementById('menu').style.display = screen === 'menu' ? 'block' : 'none';
+            document.getElementById('waiting').style.display = screen === 'waiting' ? 'block' : 'none';
+            document.getElementById('game').style.display = screen === 'game' ? 'block' : 'none';
+            document.getElementById('game-canvas').style.display = screen === 'game' ? 'block' : 'none';
+        }
+        
+        function joinGame() {
+            ws.send(JSON.stringify({ type: 'join' }));
+        }
+        
+        function leaveRoom() {
+            ws.send(JSON.stringify({ type: 'leave' }));
+            showScreen('menu');
+            roomId = null;
+        }
+        
+        function sendDirection(dir) {
+            if (!roomId) return;
+            ws.send(JSON.stringify({
+                type: 'direction',
+                data: { direction: dir }
+            }));
+        }
+        
+        function render() {
+            if (!gameState) return;
+            
+            // 清空画布
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制网格
+            ctx.strokeStyle = '#1a1a2e';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x <= GRID_WIDTH; x++) {
+                ctx.beginPath();
+                ctx.moveTo(x * CELL_SIZE, 0);
+                ctx.lineTo(x * CELL_SIZE, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= GRID_HEIGHT; y++) {
+                ctx.beginPath();
+                ctx.moveTo(0, y * CELL_SIZE);
+                ctx.lineTo(canvas.width, y * CELL_SIZE);
+                ctx.stroke();
+            }
+            
+            // 绘制食物
+            for (const food of gameState.foods) {
+                ctx.fillStyle = '#ff0066';
+                ctx.shadowColor = '#ff0066';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(
+                    food.x * CELL_SIZE + CELL_SIZE / 2,
+                    food.y * CELL_SIZE + CELL_SIZE / 2,
+                    CELL_SIZE / 2 - 2,
+                    0, Math.PI * 2
+                );
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            
+            // 绘制蛇
+            const colors = ['#00ff88', '#ffa500'];
+            let colorIdx = 0;
+            
+            for (const id of playerOrder) {
+                const snake = gameState.players[id];
+                if (!snake) continue;
+                
+                const color = colors[colorIdx];
+                const isMe = id === playerId;
+                
+                for (let i = 0; i < snake.body.length; i++) {
+                    const seg = snake.body[i];
+                    const alpha = snake.alive ? 1 : 0.3;
+                    
+                    if (i === 0) {
+                        // 蛇头
+                        ctx.fillStyle = color;
+                        ctx.globalAlpha = alpha;
+                        ctx.shadowColor = color;
+                        ctx.shadowBlur = 15;
+                        ctx.fillRect(
+                            seg.x * CELL_SIZE + 1,
+                            seg.y * CELL_SIZE + 1,
+                            CELL_SIZE - 2,
+                            CELL_SIZE - 2
+                        );
+                        ctx.shadowBlur = 0;
+                        
+                        // 眼睛
+                        ctx.fillStyle = '#000';
+                        ctx.beginPath();
+                        ctx.arc(
+                            seg.x * CELL_SIZE + CELL_SIZE * 0.35,
+                            seg.y * CELL_SIZE + CELL_SIZE * 0.35,
+                            2, 0, Math.PI * 2
+                        );
+                        ctx.arc(
+                            seg.x * CELL_SIZE + CELL_SIZE * 0.65,
+                            seg.y * CELL_SIZE + CELL_SIZE * 0.35,
+                            2, 0, Math.PI * 2
+                        );
+                        ctx.fill();
+                    } else {
+                        // 身体
+                        ctx.fillStyle = color;
+                        ctx.globalAlpha = alpha * (1 - i * 0.02);
+                        ctx.fillRect(
+                            seg.x * CELL_SIZE + 2,
+                            seg.y * CELL_SIZE + 2,
+                            CELL_SIZE - 4,
+                            CELL_SIZE - 4
+                        );
+                    }
+                }
+                
+                ctx.globalAlpha = 1;
+                colorIdx++;
+            }
+        }
+        
+        function updateScores() {
+            if (!gameState || playerOrder.length < 2) return;
+            
+            const p1 = gameState.players[playerOrder[0]];
+            const p2 = gameState.players[playerOrder[1]];
+            
+            document.getElementById('score1').textContent = p1 ? p1.score : 0;
+            document.getElementById('score2').textContent = p2 ? p2.score : 0;
+        }
+        
+        function showGameOver(winner) {
+            const overlay = document.getElementById('game-over');
+            const title = document.getElementById('result-title');
+            const text = document.getElementById('result-text');
+            
+            if (winner === 'opponent_left') {
+                title.textContent = '🏆 胜利!';
+                title.style.color = '#00ff88';
+                text.textContent = '对手离开了游戏';
+            } else if (winner === playerId) {
+                title.textContent = '🏆 胜利!';
+                title.style.color = '#00ff88';
+                text.textContent = '你打败了对手!';
+            } else if (winner === '') {
+                title.textContent = '💥 平局!';
+                title.style.color = '#ffa500';
+                text.textContent = '双方同归于尽!';
+            } else {
+                title.textContent = '💀 失败...';
+                title.style.color = '#e94560';
+                text.textContent = '再接再厉!';
+            }
+            
+            overlay.style.display = 'flex';
+        }
+        
+        function backToMenu() {
+            document.getElementById('game-over').style.display = 'none';
+            showScreen('menu');
+            roomId = null;
+            gameState = null;
+            playerOrder = [];
+        }
+        
+        // 键盘控制
+        document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    sendDirection('up');
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    sendDirection('down');
+                    e.preventDefault();
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    sendDirection('left');
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    sendDirection('right');
+                    e.preventDefault();
+                    break;
+            }
+        });
+        
+        // 启动
+        connect();
+    </script>
+</body>
+</html>
+
