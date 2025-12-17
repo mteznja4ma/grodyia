@@ -1,8 +1,6 @@
 package grodyia
 
 import (
-	"time"
-
 	"github.com/google/uuid"
 
 	"grodyia/codec"
@@ -24,9 +22,6 @@ type Options struct {
 
 	// 编解码器
 	Codec codec.Codec
-
-	// 优雅关闭超时
-	ShutdownTimeout time.Duration
 }
 
 // Option 配置函数
@@ -36,11 +31,10 @@ type Option func(*Options)
 func DefaultOptions() Options {
 	id := uuid.New().String()[:8]
 	return Options{
-		Name:            "grodyia-app",
-		ID:              id,
-		Version:         "1.0.0",
-		Metadata:        make(map[string]string),
-		ShutdownTimeout: time.Second * 30,
+		Name:     "grodyia-app",
+		ID:       id,
+		Version:  "1.0.0",
+		Metadata: make(map[string]string),
 	}
 }
 
@@ -85,12 +79,5 @@ func WithRegistry(r registry.Registry) Option {
 func WithCodec(c codec.Codec) Option {
 	return func(o *Options) {
 		o.Codec = c
-	}
-}
-
-// WithShutdownTimeout 设置优雅关闭超时
-func WithShutdownTimeout(d time.Duration) Option {
-	return func(o *Options) {
-		o.ShutdownTimeout = d
 	}
 }
