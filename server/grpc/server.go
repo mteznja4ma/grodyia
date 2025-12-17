@@ -5,30 +5,26 @@ import (
 	"google.golang.org/grpc/health"
 )
 
-type (
-	// RegisterFn defines the method to register a server.
-	RegisterFn func(*grpc.Server)
+// baseRpcService is the base implementation
+type baseRpcService struct {
+	options            Options
+	server             *grpc.Server
+	health             *health.Server
+	unaryInterceptors  []grpc.UnaryServerInterceptor
+	streamInterceptors []grpc.StreamServerInterceptor
+}
 
-	Option func(*Options)
-
-	Service interface {
-		// Init Options
-		Init(opts ...Option) error
-		// Options Get
-		Options() Options
-		// Start the Service
-		Start(register RegisterFn) error
-		// Stop the Service
-		Stop() error
-		// Handler the Service
-		// Handler(ctx context.Context, cmd *message.Invocation) (*message.Return, error)
+// newBaseRpcService creates a new base service
+func newBaseRpcService(opts Options) *baseRpcService {
+	var h *health.Server
+	if opts.Health {
+		h = health.NewServer()
 	}
 
-	baseRpcService struct {
-		options            Options
-		grpcOptions        []grpc.ServerOption
-		health             *health.Server
-		streamInterceptors []grpc.StreamServerInterceptor
-		unaryInterceptors  []grpc.UnaryServerInterceptor
+	return &baseRpcService{
+		options:            opts,
+		health:             h,
+		unaryInterceptors:  opts.UnaryInterceptors,
+		streamInterceptors: opts.StreamInterceptors,
 	}
-)
+}

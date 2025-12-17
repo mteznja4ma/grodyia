@@ -2,24 +2,27 @@ package registry
 
 import "time"
 
+// Watcher watches for service changes
 type Watcher interface {
-	Next() (*Result, error)
+	// Next returns the next event
+	Next() (*Event, error)
+	// Stop stops the watcher
 	Stop()
 }
 
-type Result struct {
-	Service *Service
-	Action  string
-}
-
+// EventType is the type of registry event
 type EventType int
 
 const (
+	// Create event
 	Create EventType = iota
+	// Delete event
 	Delete
+	// Update event
 	Update
 )
 
+// String returns the string representation
 func (e EventType) String() string {
 	switch e {
 	case Create:
@@ -33,13 +36,12 @@ func (e EventType) String() string {
 	}
 }
 
+// Event represents a registry event
 type Event struct {
-	// Timestamp of the event
-	Timestamp time.Time
 	// Type of event
 	Type EventType
-	// Service that was created, deleted, updated
+	// Service that changed
 	Service *Service
-	// Id is registry node id
-	Id string
+	// Timestamp of the event
+	Timestamp time.Time
 }

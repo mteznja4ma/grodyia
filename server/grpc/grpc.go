@@ -1,64 +1,182 @@
 package grpc
 
 import (
+	"context"
+	"fmt"
+	"net"
+	"time"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
-	"grodyia/internal/rpc"
-	"net"
+
+	"grodyia/health"
+	"grodyia/logger"
 )
 
-type grpcService struct {
+// RegisterFn 注册函数
+type RegisterFn func(*grpc.Server)
+
+// Server 是 gRPC 服务器，实现 grodyia.Transport 接口
+type Server struct {
 	*baseRpcService
-	rpc.UnimplementedConnectServer
-	options Options
+	healthStatus health.Health
+	listener     net.Listener
+	registerFn   RegisterFn
+	addr         string
 }
 
-func NewGRPCServer(opts ...Option) Service {
-	g := &grpcService{}
-	g.options = Options{}
+// NewServer 创建新的 gRPC 服务器
+func NewServer(opts ...Option) *Server {
+	options := DefaultOptions()
 	for _, o := range opts {
-		o(&g.options)
+		o(&options)
 	}
-	return g
+
+	return &Server{
+		baseRpcService: newBaseRpcService(options),
+		healthStatus:   health.NewHealthState(fmt.Sprintf("grpc-%s", options.Address)),
+		addr:           options.Address,
+	}
 }
 
-func (g *grpcService) Init(opts ...Option) error {
-	return nil
+// Name 返回传输层名称
+func (s *Server) Name() string {
+	return "grpc"
 }
 
-func (g *grpcService) Options() Options {
-	return g.Options()
+// Addr 返回监听地址
+func (s *Server) Addr() string {
+	return s.addr
 }
 
-func (g *grpcService) Start(register RegisterFn) error {
-	ln, err := net.Listen("tcp", g.Options().GetAddress())
+// Register 注册 gRPC 服务
+func (s *Server) Register(fn RegisterFn) *Server {
+	s.registerFn = fn
+	return s
+}
+
+// Start 启动服务器 (非阻塞)
+func (s *Server) Start(ctx context.Context) error {
+	ln, err := net.Listen("tcp", s.options.Address)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to listen on %s: %w", s.options.Address, err)
+	}
+	s.listener = ln
+
+	// 构建拦截器
+	unaryInterceptorOption := grpc.ChainUnaryInterceptor(s.buildUnaryInterceptors()...)
+	streamInterceptorOption := grpc.ChainStreamInterceptor(s.buildStreamInterceptors()...)
+
+	serverOpts := append(s.options.GrpcOptions, unaryInterceptorOption, streamInterceptorOption)
+	s.server = grpc.NewServer(serverOpts...)
+
+	// 注册用户服务
+	if s.registerFn != nil {
+		s.registerFn(s.server)
 	}
 
-	//unaryInterceptorOption := grpc.ChainUnaryInterceptor(g.buildUnaryInterceptors()...)
-	//streamInterceptorOption := grpc.ChainStreamInterceptor(g.buildStreamInterceptors()...)
-	//
-	//options := append(g.Options().GetGrpcOptions(), unaryInterceptorOption, streamInterceptorOption)
-
-	s := grpc.NewServer(g.Options().GetGrpcOptions()...)
-	register(s)
-
-	// register the health check service
-	if g.health != nil {
-		grpc_health_v1.RegisterHealthServer(s, g.health)
-		g.health.Resume()
+	// 注册健康检查
+	if s.health != nil {
+		grpc_health_v1.RegisterHealthServer(s.server, s.health)
+		s.health.Resume()
 	}
-	//g.healthManager.MarkReady()
-	//health.AddProbe(s.healthManager)
 
-	defer func() {
-		s.GracefulStop()
+	s.healthStatus.SetReady()
+	health.AddHealthState(s.healthStatus)
+
+	// 非阻塞启动
+	go func() {
+		logger.Info("grpc", "gRPC server starting on %s", s.options.Address)
+		if err := s.server.Serve(ln); err != nil {
+			logger.Error("grpc", "Server error: %v", err)
+		}
 	}()
 
-	return s.Serve(ln)
+	return nil
 }
 
-func (g *grpcService) Stop() error {
+// Stop 停止服务器
+func (s *Server) Stop(ctx context.Context) error {
+	if s.server == nil {
+		return nil
+	}
+
+	logger.Info("grpc", "gRPC server stopping...")
+	s.healthStatus.SetNoReady()
+
+	done := make(chan struct{})
+	go func() {
+		s.server.GracefulStop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		logger.Info("grpc", "Server stopped gracefully")
+	case <-time.After(time.Second * 10):
+		logger.Warning("grpc", "Server force stopping")
+		s.server.Stop()
+	}
+
 	return nil
+}
+
+// Server 返回底层 grpc.Server
+func (s *Server) Server() *grpc.Server {
+	return s.server
+}
+
+func (s *Server) buildUnaryInterceptors() []grpc.UnaryServerInterceptor {
+	interceptors := []grpc.UnaryServerInterceptor{
+		s.recoveryInterceptor(),
+		s.loggingInterceptor(),
+	}
+	return append(interceptors, s.unaryInterceptors...)
+}
+
+func (s *Server) buildStreamInterceptors() []grpc.StreamServerInterceptor {
+	interceptors := []grpc.StreamServerInterceptor{
+		s.streamRecoveryInterceptor(),
+	}
+	return append(interceptors, s.streamInterceptors...)
+}
+
+func (s *Server) recoveryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("grpc", "Panic recovered: %v", r)
+				err = fmt.Errorf("internal error")
+			}
+		}()
+		return handler(ctx, req)
+	}
+}
+
+func (s *Server) loggingInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		start := time.Now()
+		resp, err := handler(ctx, req)
+		duration := time.Since(start)
+
+		if err != nil {
+			logger.Warning("grpc", "%s | %v | error: %v", info.FullMethod, duration, err)
+		} else {
+			logger.Debug("grpc", "%s | %v", info.FullMethod, duration)
+		}
+
+		return resp, err
+	}
+}
+
+func (s *Server) streamRecoveryInterceptor() grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("grpc", "Stream panic recovered: %v", r)
+				err = fmt.Errorf("internal error")
+			}
+		}()
+		return handler(srv, ss)
+	}
 }
