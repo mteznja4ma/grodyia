@@ -53,8 +53,14 @@ type App struct {
 
 // Transport 传输层接口 (gRPC/HTTP/WebSocket)
 type Transport interface {
+	// ID 传输层ID
+	ID() string
 	// Name 传输层名称
 	Name() string
+	// Version 传输层版本
+	Version() string
+	// Metadata 传输层元数据
+	Metadata() map[string]string
 	// Start 启动 (非阻塞)
 	Start(ctx context.Context) error
 	// Stop 停止
@@ -260,11 +266,11 @@ func (a *App) Start() error {
 		// 注册到注册中心
 		if a.registry != nil {
 			svc := &registry.Service{
-				ID:       a.opts.ID,
-				Name:     a.opts.Name,
-				Version:  a.opts.Version,
+				ID:       t.ID(),
+				Name:     t.Name(),
+				Version:  t.Version(),
 				Address:  t.Addr(),
-				Metadata: a.opts.Metadata,
+				Metadata: t.Metadata(),
 			}
 			if err := a.registry.Register(svc); err != nil {
 				logger.Warning(a.opts.Name, "Registry register failed: %v", err)
@@ -325,8 +331,8 @@ func (a *App) Stop() error {
 	if a.registry != nil {
 		for _, t := range a.transports {
 			svc := &registry.Service{
-				Name: a.opts.Name,
-				ID:   fmt.Sprintf("%s-%s", a.opts.ID, t.Name()),
+				Name: t.Name(),
+				ID:   a.opts.ID,
 			}
 			a.registry.Deregister(svc)
 		}

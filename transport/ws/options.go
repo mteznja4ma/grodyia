@@ -3,13 +3,18 @@ package ws
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mteznja4ma/grodyia/codec"
 )
 
 // Options for WebSocket server
 type Options struct {
+	// ID unique identifier
+	ID string
 	// Name of the service
 	Name string
+	// Version of the service
+	Version string
 	// Address to bind
 	Address string
 	// Path for WebSocket endpoint
@@ -51,6 +56,7 @@ type Option func(*Options)
 // DefaultOptions returns sensible defaults
 func DefaultOptions() Options {
 	return Options{
+		ID:                uuid.New().String()[:8],
 		Name:              "ws-service",
 		Address:           ":8080",
 		Path:              "/ws",

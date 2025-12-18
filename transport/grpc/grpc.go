@@ -39,9 +39,24 @@ func NewServer(opts ...Option) *Server {
 	}
 }
 
+// ID 返回传输层ID
+func (s *Server) ID() string {
+	return s.baseRpcService.options.ID
+}
+
+// Metadata 返回传输层元数据
+func (s *Server) Metadata() map[string]string {
+	return s.baseRpcService.options.Metadata
+}
+
+// Version 返回传输层版本
+func (s *Server) Version() string {
+	return s.baseRpcService.options.Version
+}
+
 // Name 返回传输层名称
 func (s *Server) Name() string {
-	return "grpc"
+	return s.baseRpcService.options.Name
 }
 
 // Addr 返回监听地址

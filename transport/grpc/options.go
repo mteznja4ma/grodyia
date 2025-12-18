@@ -3,6 +3,7 @@ package grpc
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mteznja4ma/grodyia/codec"
 
 	"google.golang.org/grpc"
@@ -49,6 +50,7 @@ type Option func(*Options)
 // DefaultOptions returns sensible defaults
 func DefaultOptions() Options {
 	return Options{
+		ID:           uuid.New().String()[:8],
 		Name:         "grpc-service",
 		Address:      ":9000",
 		MaxConn:      1000,

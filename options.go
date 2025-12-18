@@ -10,8 +10,8 @@ import (
 // Options 应用配置
 type Options struct {
 	// 服务基本信息
-	Name    string
 	ID      string
+	Name    string
 	Version string
 
 	// 元数据
