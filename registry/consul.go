@@ -138,12 +138,13 @@ func (r *consulRegistry) Register(s *Service) error {
 		return ErrNotConnected
 	}
 
+	address, port := parseAddr(s.Address, 80)
 	// Build service registration
 	registration := &api.AgentServiceRegistration{
 		ID:      s.ID,
 		Name:    s.Name,
-		Address: s.Address,
-		Port:    s.Port,
+		Address: address,
+		Port:    port,
 		Tags:    []string{s.Version},
 		Meta:    s.Metadata,
 		Check: &api.AgentServiceCheck{
@@ -181,7 +182,7 @@ func (r *consulRegistry) Register(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Create, Service: s, Timestamp: time.Now()})
-	logger.Info("consul", "Registered service: %s/%s @ %s:%d", s.Name, s.ID, s.Address, s.Port)
+	logger.Info("consul", "Registered service: %s/%s @ %s", s.Name, s.ID, s.Address)
 	return nil
 }
 
@@ -252,11 +253,11 @@ func (r *consulRegistry) GetService(name string) ([]*Service, error) {
 		if len(entry.Service.Tags) > 0 {
 			version = entry.Service.Tags[0]
 		}
+
 		services = append(services, &Service{
 			Name:     entry.Service.Service,
 			ID:       entry.Service.ID,
-			Address:  entry.Service.Address,
-			Port:     entry.Service.Port,
+			Address:  fmt.Sprintf("%s:%d", entry.Service.Address, entry.Service.Port),
 			Version:  version,
 			Healthy:  true,
 			Metadata: entry.Service.Meta,
@@ -305,7 +306,7 @@ func (r *consulRegistry) ListServices() ([]*Service, error) {
 	return result, nil
 }
 
-func (r *consulRegistry) Watch(opts ...WatchOption) (Watcher, error) {
+func (r *consulRegistry) Watch() (Watcher, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -313,24 +314,19 @@ func (r *consulRegistry) Watch(opts ...WatchOption) (Watcher, error) {
 		return nil, ErrNotConnected
 	}
 
-	var options WatchOptions
-	for _, o := range opts {
-		o(&options)
-	}
-
 	r.nextID++
 	w := &consulWatcher{
 		id:      r.nextID,
 		events:  make(chan *Event, 100),
 		done:    make(chan struct{}),
-		service: options.Service,
+		service: r.opts.WatcherOption.Service,
 		r:       r,
 	}
 
 	r.watchers[w.id] = w
 
 	// Start watching if specific service
-	if options.Service != "" {
+	if r.opts.WatcherOption.Service != "" {
 		go w.watch()
 	}
 
@@ -343,6 +339,7 @@ func (r *consulRegistry) notify(event *Event) {
 			select {
 			case w.events <- event:
 			default:
+				logger.Warning("consul", "Watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}
@@ -410,15 +407,22 @@ func (w *consulWatcher) watch() {
 				s := &Service{
 					Name:     entry.Service.Service,
 					ID:       entry.Service.ID,
-					Address:  entry.Service.Address,
-					Port:     entry.Service.Port,
+					Address:  fmt.Sprintf("%s:%d", entry.Service.Address, entry.Service.Port),
 					Version:  version,
 					Healthy:  true,
 					Metadata: entry.Service.Meta,
 				}
+
+				event := &Event{Type: Update, Service: s, Timestamp: time.Now()}
+
+				if w.r.opts.WatcherOption.OnEvent != nil {
+					w.r.opts.WatcherOption.OnEvent(event)
+				}
+
 				select {
-				case w.events <- &Event{Type: Update, Service: s, Timestamp: time.Now()}:
+				case w.events <- event:
 				default:
+					logger.Warning("consul", "Watcher event channel full, dropping update for service: %s", s.Name)
 				}
 			}
 		}

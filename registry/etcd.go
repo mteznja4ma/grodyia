@@ -141,7 +141,7 @@ func (r *etcdRegistry) Register(s *Service) error {
 	s.Healthy = true
 
 	// Register service with lease
-	key := etcdPrefix + "/" + r.opts.Group + "/" + r.opts.Namespace + "/" + s.ID
+	key := etcdPrefix + "/" + r.opts.Group + "/" + r.opts.Namespace + "/" + s.Name + "/" + s.ID
 	value, _ := json.Marshal(s)
 
 	_, err = r.client.Put(ctx, key, string(value), clientv3.WithLease(lease.ID))
@@ -177,7 +177,7 @@ func (r *etcdRegistry) Register(s *Service) error {
 	}()
 
 	// Update local cache
-	services := r.services[s.Name]
+	services := r.services[s.ID]
 	found := false
 	for i, svc := range services {
 		if svc.ID == s.ID {
@@ -187,7 +187,7 @@ func (r *etcdRegistry) Register(s *Service) error {
 		}
 	}
 	if !found {
-		r.services[s.Name] = append(services, s)
+		r.services[s.ID] = append(services, s)
 	}
 
 	r.notify(&Event{Type: Create, Service: s, Timestamp: time.Now()})
@@ -203,7 +203,7 @@ func (r *etcdRegistry) Deregister(s *Service) error {
 		return ErrNotConnected
 	}
 
-	key := etcdPrefix + "/" + r.opts.Group + "/" + r.opts.Namespace + "/" + s.ID
+	key := etcdPrefix + "/" + r.opts.Group + "/" + r.opts.Namespace + "/" + s.Name + "/" + s.ID
 
 	// Revoke lease if exists
 	if leaseID, ok := r.registered[key]; ok {
@@ -242,7 +242,7 @@ func (r *etcdRegistry) GetService(name string) ([]*Service, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.opts.Timeout)
 	defer cancel()
 
-	prefix := etcdPrefix + name + "/"
+	prefix := etcdPrefix + "/" + r.opts.Group + "/" + r.opts.Namespace + "/" + name
 	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("etcd get service failed: %w", err)
@@ -297,7 +297,7 @@ func (r *etcdRegistry) ListServices() ([]*Service, error) {
 	return services, nil
 }
 
-func (r *etcdRegistry) Watch(opts ...WatchOption) (Watcher, error) {
+func (r *etcdRegistry) Watch() (Watcher, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -305,17 +305,12 @@ func (r *etcdRegistry) Watch(opts ...WatchOption) (Watcher, error) {
 		return nil, ErrNotConnected
 	}
 
-	var options WatchOptions
-	for _, o := range opts {
-		o(&options)
-	}
-
 	r.nextID++
 	w := &etcdWatcher{
 		id:      r.nextID,
 		events:  make(chan *Event, 100),
 		done:    make(chan struct{}),
-		service: options.Service,
+		service: r.opts.WatcherOption.Service,
 		r:       r,
 	}
 
@@ -333,6 +328,7 @@ func (r *etcdRegistry) notify(event *Event) {
 			select {
 			case w.events <- event:
 			default:
+				logger.Warning("etcd", "Watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}
@@ -347,9 +343,9 @@ type etcdWatcher struct {
 }
 
 func (w *etcdWatcher) watch() {
-	prefix := etcdPrefix
+	prefix := etcdPrefix + "/" + w.r.opts.Group + "/" + w.r.opts.Namespace
 	if w.service != "" {
-		prefix = etcdPrefix + w.service + "/"
+		prefix += "/" + w.service
 	}
 
 	watchCh := w.r.client.Watch(context.Background(), prefix, clientv3.WithPrefix())
@@ -367,7 +363,7 @@ func (w *etcdWatcher) watch() {
 				if err := json.Unmarshal(ev.Kv.Value, &s); err != nil {
 					// Try to parse service name from key
 					key := string(ev.Kv.Key)
-					parts := strings.Split(strings.TrimPrefix(key, etcdPrefix), "/")
+					parts := strings.Split(strings.TrimPrefix(key, prefix), "/")
 					if len(parts) >= 2 {
 						s.Name = parts[0]
 						s.ID = parts[1]
@@ -386,9 +382,16 @@ func (w *etcdWatcher) watch() {
 					eventType = Delete
 				}
 
+				event := &Event{Type: eventType, Service: &s, Timestamp: time.Now()}
+
+				if w.r.opts.WatcherOption.OnEvent != nil {
+					w.r.opts.WatcherOption.OnEvent(event)
+				}
+
 				select {
-				case w.events <- &Event{Type: eventType, Service: &s, Timestamp: time.Now()}:
+				case w.events <- event:
 				default:
+					logger.Warning("etcd", "Watcher event channel full, dropping event for service: %s", s.Name)
 				}
 			}
 		}

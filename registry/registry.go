@@ -49,7 +49,7 @@ type Registry interface {
 	// ListServices lists all services
 	ListServices() ([]*Service, error)
 	// Watch returns a watcher for service changes
-	Watch(...WatchOption) (Watcher, error)
+	Watch() (Watcher, error)
 }
 
 // Service represents a service
@@ -62,8 +62,6 @@ type Service struct {
 	ID string `json:"id"`
 	// Address of the service
 	Address string `json:"address"`
-	// Port of the service
-	Port int `json:"port"`
 	// Metadata for additional info
 	Metadata map[string]string `json:"metadata"`
 	// Endpoints of the service

@@ -260,8 +260,8 @@ func (a *App) Start() error {
 		// 注册到注册中心
 		if a.registry != nil {
 			svc := &registry.Service{
+				ID:       a.opts.ID,
 				Name:     a.opts.Name,
-				ID:       fmt.Sprintf("%s-%s", a.opts.ID, t.Name()),
 				Version:  a.opts.Version,
 				Address:  t.Addr(),
 				Metadata: a.opts.Metadata,
@@ -269,6 +269,8 @@ func (a *App) Start() error {
 			if err := a.registry.Register(svc); err != nil {
 				logger.Warning(a.opts.Name, "Registry register failed: %v", err)
 			}
+			// Watcher
+			a.registry.Watch()
 		}
 	}
 

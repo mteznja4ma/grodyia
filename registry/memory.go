@@ -3,6 +3,8 @@ package registry
 import (
 	"sync"
 	"time"
+
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 // memoryRegistry is an in-memory implementation
@@ -158,21 +160,16 @@ func (r *memoryRegistry) ListServices() ([]*Service, error) {
 	return result, nil
 }
 
-func (r *memoryRegistry) Watch(opts ...WatchOption) (Watcher, error) {
+func (r *memoryRegistry) Watch() (Watcher, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	var options WatchOptions
-	for _, o := range opts {
-		o(&options)
-	}
 
 	r.nextID++
 	w := &memoryWatcher{
 		id:      r.nextID,
 		events:  make(chan *Event, 100),
 		done:    make(chan struct{}),
-		service: options.Service,
+		service: r.opts.WatcherOption.Service,
 		r:       r,
 	}
 
@@ -186,6 +183,7 @@ func (r *memoryRegistry) notify(event *Event) {
 			select {
 			case w.events <- event:
 			default:
+				logger.Warning("memory", "Watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}

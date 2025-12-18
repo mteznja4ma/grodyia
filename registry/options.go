@@ -45,6 +45,9 @@ type Options struct {
 
 	// TLSCACert path to CA certificate
 	TLSCACert string
+
+	// Watcher Option
+	WatcherOption WatchOptions
 }
 
 // Option is a function that modifies Options
@@ -137,18 +140,28 @@ func WithTLS(cert, key, caCert string) Option {
 	}
 }
 
+// WithWatcherOptions sets watcher options
+func WithWatcherOption(option WatchOptions) Option {
+	return func(o *Options) {
+		o.WatcherOption = option
+	}
+}
+
 // WatchOptions for watching services
 type WatchOptions struct {
 	// Service to watch (empty for all)
 	Service string
+	// Event callback function
+	OnEvent func(*Event)
 }
 
 // WatchOption is a function that modifies WatchOptions
 type WatchOption func(*WatchOptions)
 
 // WatchService filters by service name
-func WatchService(name string) WatchOption {
+func WatchService(name string, cb func(*Event)) WatchOption {
 	return func(o *WatchOptions) {
 		o.Service = name
+		o.OnEvent = cb
 	}
 }

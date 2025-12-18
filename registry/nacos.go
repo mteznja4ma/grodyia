@@ -144,9 +144,11 @@ func (r *nacosRegistry) Register(s *Service) error {
 		return ErrNotConnected
 	}
 
+	address, port := parseAddr(s.Address, 80)
+
 	success, err := r.client.RegisterInstance(vo.RegisterInstanceParam{
-		Ip:          s.Address,
-		Port:        uint64(s.Port),
+		Ip:          address,
+		Port:        uint64(port),
 		ServiceName: s.Name,
 		GroupName:   r.opts.Group,
 		Weight:      10,
@@ -182,7 +184,7 @@ func (r *nacosRegistry) Register(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Create, Service: s, Timestamp: time.Now()})
-	logger.Info("nacos", "Registered service: %s/%s @ %s:%d", s.Name, s.ID, s.Address, s.Port)
+	logger.Info("nacos", "Registered service: %s/%s @ %s", s.Name, s.ID, s.Address)
 	return nil
 }
 
@@ -191,9 +193,10 @@ func (r *nacosRegistry) deregisterInstance(s *Service) error {
 		return nil
 	}
 
+	address, port := parseAddr(s.Address, 80)
 	_, err := r.client.DeregisterInstance(vo.DeregisterInstanceParam{
-		Ip:          s.Address,
-		Port:        uint64(s.Port),
+		Ip:          address,
+		Port:        uint64(port),
 		ServiceName: s.Name,
 		GroupName:   r.opts.Group,
 		Ephemeral:   true,
@@ -272,8 +275,7 @@ func (r *nacosRegistry) instancesToServices(name string, instances []model.Insta
 		services = append(services, &Service{
 			Name:     name,
 			ID:       inst.InstanceId,
-			Address:  inst.Ip,
-			Port:     int(inst.Port),
+			Address:  fmt.Sprintf("%s:%d", inst.Ip, inst.Port),
 			Healthy:  inst.Healthy,
 			Metadata: inst.Metadata,
 		})
@@ -292,7 +294,7 @@ func (r *nacosRegistry) ListServices() ([]*Service, error) {
 	return result, nil
 }
 
-func (r *nacosRegistry) Watch(opts ...WatchOption) (Watcher, error) {
+func (r *nacosRegistry) Watch() (Watcher, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -300,26 +302,21 @@ func (r *nacosRegistry) Watch(opts ...WatchOption) (Watcher, error) {
 		return nil, ErrNotConnected
 	}
 
-	var options WatchOptions
-	for _, o := range opts {
-		o(&options)
-	}
-
 	r.nextID++
 	w := &nacosWatcher{
 		id:      r.nextID,
 		events:  make(chan *Event, 100),
 		done:    make(chan struct{}),
-		service: options.Service,
+		service: r.opts.WatcherOption.Service,
 		r:       r,
 	}
 
 	r.watchers[w.id] = w
 
 	// Subscribe to service changes if specific service is specified
-	if options.Service != "" {
+	if r.opts.WatcherOption.Service != "" {
 		err := r.client.Subscribe(&vo.SubscribeParam{
-			ServiceName: options.Service,
+			ServiceName: r.opts.WatcherOption.Service,
 			GroupName:   r.opts.Group,
 			SubscribeCallback: func(services []model.Instance, err error) {
 				if err != nil {
@@ -327,16 +324,22 @@ func (r *nacosRegistry) Watch(opts ...WatchOption) (Watcher, error) {
 				}
 				for _, inst := range services {
 					s := &Service{
-						Name:     options.Service,
+						Name:     r.opts.WatcherOption.Service,
 						ID:       inst.InstanceId,
-						Address:  inst.Ip,
-						Port:     int(inst.Port),
+						Address:  fmt.Sprintf("%s:%d", inst.Ip, inst.Port),
 						Healthy:  inst.Healthy,
 						Metadata: inst.Metadata,
 					}
+
+					event := &Event{Type: Update, Service: s, Timestamp: time.Now()}
+					if r.opts.WatcherOption.OnEvent != nil {
+						r.opts.WatcherOption.OnEvent(event)
+					}
+
 					select {
-					case w.events <- &Event{Type: Update, Service: s, Timestamp: time.Now()}:
+					case w.events <- event:
 					default:
+						logger.Warning("nacos", "Watcher event channel full, dropping update for service: %s", s.Name)
 					}
 				}
 			},
@@ -356,6 +359,7 @@ func (r *nacosRegistry) notify(event *Event) {
 			select {
 			case w.events <- event:
 			default:
+				logger.Warning("nacos", "Watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}
