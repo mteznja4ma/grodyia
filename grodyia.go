@@ -8,11 +8,11 @@ import (
 	"sync"
 	"syscall"
 
-	"grodyia/codec"
-	"grodyia/config"
-	"grodyia/events"
-	"grodyia/logger"
-	"grodyia/registry"
+	"github.com/mteznja4ma/grodyia/codec"
+	"github.com/mteznja4ma/grodyia/config"
+	"github.com/mteznja4ma/grodyia/events"
+	"github.com/mteznja4ma/grodyia/logger"
+	"github.com/mteznja4ma/grodyia/registry"
 )
 
 const (
@@ -337,7 +337,7 @@ func (a *App) Stop() error {
 	}
 
 	// 关闭事件总线
-	// a.eventBus.Close()
+	a.eventBus.Close()
 
 	// 取消应用上下文
 	a.cancel()

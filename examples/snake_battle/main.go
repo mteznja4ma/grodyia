@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"grodyia"
-	"grodyia/examples/snake_battle/game"
-	"grodyia/logger"
-	"grodyia/server/ws"
+	"github.com/mteznja4ma/grodyia"
+	"github.com/mteznja4ma/grodyia/examples/snake_battle/game"
+	"github.com/mteznja4ma/grodyia/logger"
+	"github.com/mteznja4ma/grodyia/transport/ws"
 )
 
 // 消息类型
@@ -337,7 +337,7 @@ func main() {
 	})
 
 	go func() {
-		logger.Info("game", "Static server on http://localhost:8081")
+		logger.Info("game", "Static server on http://localhost:8086")
 		http.ListenAndServe(":8086", nil)
 	}()
 
@@ -359,8 +359,8 @@ func main() {
 	fmt.Println("=================================")
 	fmt.Println("🐍 Snake Battle Server")
 	fmt.Println("=================================")
-	fmt.Println("Game:   http://localhost:8081")
-	fmt.Println("WS:     ws://localhost:8080/ws")
+	fmt.Println("Game:   http://localhost:8086")
+	fmt.Println("WS:     ws://localhost:8085/ws")
 	fmt.Println("=================================")
 
 	// 启动应用

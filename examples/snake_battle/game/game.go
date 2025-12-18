@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 const (

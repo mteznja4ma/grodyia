@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"grodyia/codec"
+	"github.com/mteznja4ma/grodyia/codec"
 )
 
 // Options for WebSocket client
@@ -159,4 +159,3 @@ func WithSubprotocols(protocols ...string) Option {
 		o.Subprotocols = protocols
 	}
 }
-

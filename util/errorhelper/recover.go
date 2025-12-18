@@ -3,7 +3,7 @@ package errorhelper
 import (
 	"runtime/debug"
 
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 func Recover() {

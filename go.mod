@@ -1,4 +1,4 @@
-module grodyia
+module github.com/mteznja4ma/grodyia
 
 go 1.23.1
 

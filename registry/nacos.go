@@ -11,7 +11,7 @@ import (
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 // nacosRegistry implements Registry for Nacos using official SDK

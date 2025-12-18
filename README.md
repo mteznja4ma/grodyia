@@ -16,9 +16,9 @@ package main
 
 import (
     "grodyia"
-    "grodyia/server/ws"
-    "grodyia/server/http"
-    "grodyia/registry"
+    "github.com/mteznja4ma/grodyia/server/ws"
+    "github.com/mteznja4ma/grodyia/server/http"
+    "github.com/mteznja4ma/grodyia/registry"
 )
 
 func main() {
@@ -119,7 +119,7 @@ app.Run()
 ### WebSocket
 
 ```go
-import "grodyia/server/ws"
+import "github.com/mteznja4ma/grodyia/server/ws"
 
 server := ws.NewServer(
     ws.WithAddress(":8080"),
@@ -147,7 +147,7 @@ server.OnMessage(func(ctx context.Context, msg *ws.Message) error {
 ### HTTP
 
 ```go
-import "grodyia/server/http"
+import "github.com/mteznja4ma/grodyia/server/http"
 
 server := http.NewServer(
     http.WithAddress(":8081"),
@@ -163,7 +163,7 @@ router.DELETE("/api/users/:id", deleteUser)
 ### gRPC
 
 ```go
-import "grodyia/server/grpc"
+import "github.com/mteznja4ma/grodyia/server/grpc"
 
 server := grpc.NewServer(
     grpc.WithAddress(":9000"),
@@ -178,7 +178,7 @@ server.Register(func(s *grpc.Server) {
 ## Registry 注册中心
 
 ```go
-import "grodyia/registry"
+import "github.com/mteznja4ma/grodyia/registry"
 
 // 创建注册中心
 reg := registry.NewRegistry(registry.TypeNacos,
@@ -206,7 +206,7 @@ app := grodyia.New(
 ## Codec 编解码器
 
 ```go
-import "grodyia/codec"
+import "github.com/mteznja4ma/grodyia/codec"
 
 // JSON (默认)
 app.SetCodec(codec.NewJSONCodec())
@@ -241,10 +241,10 @@ import (
     "encoding/json"
 
     "grodyia"
-    "grodyia/server/ws"
-    "grodyia/server/http"
-    "grodyia/registry"
-    "grodyia/logger"
+    "github.com/mteznja4ma/grodyia/server/ws"
+    "github.com/mteznja4ma/grodyia/server/http"
+    "github.com/mteznja4ma/grodyia/registry"
+    "github.com/mteznja4ma/grodyia/logger"
 )
 
 func main() {
@@ -319,7 +319,7 @@ func main() {
 ## 项目结构
 
 ```
-grodyia/
+github.com/mteznja4ma/grodyia/
 ├── grodyia.go          # App 核心
 ├── options.go          # 配置选项
 ├── codec/              # 编解码器

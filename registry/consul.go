@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/consul/api"
 
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 // consulRegistry implements Registry for Consul using official client

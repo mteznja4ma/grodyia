@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 // Client is a gRPC client wrapper

@@ -3,7 +3,7 @@ package grpc
 import (
 	"time"
 
-	"grodyia/codec"
+	"github.com/mteznja4ma/grodyia/codec"
 
 	"google.golang.org/grpc"
 )

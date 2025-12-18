@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 // Client is an HTTP client wrapper

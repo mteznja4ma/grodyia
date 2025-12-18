@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"grodyia/health"
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/health"
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 // Server 是 HTTP 服务器，实现 grodyia.Transport 接口

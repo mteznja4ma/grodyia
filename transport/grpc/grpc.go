@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
-	"grodyia/health"
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/health"
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 // RegisterFn 注册函数

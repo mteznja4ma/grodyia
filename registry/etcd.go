@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/logger"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 const (
-	etcdPrefix = "/grodyia/services/"
+	etcdPrefix = "/github.com/mteznja4ma/grodyia/services/"
 )
 
 // etcdRegistry implements Registry for etcd
@@ -416,4 +416,3 @@ func (w *etcdWatcher) Stop() {
 		close(w.done)
 	}
 }
-

@@ -9,7 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 var (

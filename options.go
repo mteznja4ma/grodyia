@@ -3,8 +3,8 @@ package grodyia
 import (
 	"github.com/google/uuid"
 
-	"grodyia/codec"
-	"grodyia/registry"
+	"github.com/mteznja4ma/grodyia/codec"
+	"github.com/mteznja4ma/grodyia/registry"
 )
 
 // Options 应用配置

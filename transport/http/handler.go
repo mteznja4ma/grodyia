@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/http"
 
-	"grodyia/codec"
+	"github.com/mteznja4ma/grodyia/codec"
 )
 
 // Context wraps http request context with utilities

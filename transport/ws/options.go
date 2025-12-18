@@ -3,7 +3,7 @@ package ws
 import (
 	"time"
 
-	"grodyia/codec"
+	"github.com/mteznja4ma/grodyia/codec"
 )
 
 // Options for WebSocket server
@@ -153,4 +153,3 @@ func WithMetadata(md map[string]string) Option {
 		o.Metadata = md
 	}
 }
-

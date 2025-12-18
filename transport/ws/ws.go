@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 
-	"grodyia/health"
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/health"
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 // Server 是 WebSocket 服务器，实现 grodyia.Transport 接口

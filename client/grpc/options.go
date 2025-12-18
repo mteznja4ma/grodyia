@@ -5,7 +5,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"grodyia/codec"
+	"github.com/mteznja4ma/grodyia/codec"
 )
 
 // Options for gRPC client
@@ -24,8 +24,8 @@ type Options struct {
 	PoolSize int
 
 	// Retry configuration
-	MaxRetries  int
-	RetryDelay  time.Duration
+	MaxRetries int
+	RetryDelay time.Duration
 
 	// gRPC dial options
 	DialOptions []grpc.DialOption

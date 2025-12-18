@@ -7,8 +7,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"grodyia/codec"
-	"grodyia/logger"
+	"github.com/mteznja4ma/grodyia/codec"
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 // Connection represents a WebSocket connection

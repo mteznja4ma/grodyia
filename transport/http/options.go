@@ -3,7 +3,7 @@ package http
 import (
 	"time"
 
-	"grodyia/codec"
+	"github.com/mteznja4ma/grodyia/codec"
 )
 
 // Options for HTTP server

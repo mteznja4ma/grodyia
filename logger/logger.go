@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"grodyia/util"
-	colorPrint "grodyia/util/colorprint"
+	"github.com/mteznja4ma/grodyia/util"
+	colorPrint "github.com/mteznja4ma/grodyia/util/colorprint"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
