@@ -16,7 +16,7 @@ type memoryRegistry struct {
 }
 
 // NewMemoryRegistry creates a new in-memory registry
-func NewMemoryRegistry(opts ...Option) Registry {
+func newMemoryRegistry(opts ...Option) Registry {
 	options := DefaultOptions()
 	for _, o := range opts {
 		o(&options)
@@ -255,4 +255,3 @@ func (w *memoryWatcher) Stop() {
 		close(w.done)
 	}
 }
-

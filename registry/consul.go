@@ -24,7 +24,7 @@ type consulRegistry struct {
 }
 
 // NewConsulRegistry creates a new Consul registry
-func NewConsulRegistry(opts ...Option) Registry {
+func newConsulRegistry(opts ...Option) Registry {
 	options := DefaultOptions()
 	options.Addresses = []string{"127.0.0.1:8500"}
 	for _, o := range opts {

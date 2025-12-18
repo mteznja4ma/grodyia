@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	etcdPrefix = "/github.com/mteznja4ma/grodyia/services/"
+	etcdPrefix = "/grodyia"
 )
 
 // etcdRegistry implements Registry for etcd
@@ -31,7 +31,7 @@ type etcdRegistry struct {
 }
 
 // NewEtcdRegistry creates a new etcd registry
-func NewEtcdRegistry(opts ...Option) Registry {
+func newEtcdRegistry(opts ...Option) Registry {
 	options := DefaultOptions()
 	options.Addresses = []string{"127.0.0.1:2379"}
 	for _, o := range opts {
@@ -137,8 +137,11 @@ func (r *etcdRegistry) Register(s *Service) error {
 		return fmt.Errorf("etcd create lease failed: %w", err)
 	}
 
+	s.LastSeen = time.Now()
+	s.Healthy = true
+
 	// Register service with lease
-	key := etcdPrefix + s.Name + "/" + s.ID
+	key := etcdPrefix + "/" + r.opts.Group + "/" + r.opts.Namespace + "/" + s.ID
 	value, _ := json.Marshal(s)
 
 	_, err = r.client.Put(ctx, key, string(value), clientv3.WithLease(lease.ID))
@@ -173,9 +176,6 @@ func (r *etcdRegistry) Register(s *Service) error {
 		}
 	}()
 
-	s.LastSeen = time.Now()
-	s.Healthy = true
-
 	// Update local cache
 	services := r.services[s.Name]
 	found := false
@@ -203,7 +203,7 @@ func (r *etcdRegistry) Deregister(s *Service) error {
 		return ErrNotConnected
 	}
 
-	key := etcdPrefix + s.Name + "/" + s.ID
+	key := etcdPrefix + "/" + r.opts.Group + "/" + r.opts.Namespace + "/" + s.ID
 
 	// Revoke lease if exists
 	if leaseID, ok := r.registered[key]; ok {

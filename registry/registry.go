@@ -93,12 +93,12 @@ type Endpoint struct {
 func NewRegistry(regType Type, opts ...Option) Registry {
 	switch regType {
 	case TypeNacos:
-		return NewNacosRegistry(opts...)
+		return newNacosRegistry(opts...)
 	case TypeConsul:
-		return NewConsulRegistry(opts...)
+		return newConsulRegistry(opts...)
 	case TypeEtcd:
-		return NewEtcdRegistry(opts...)
+		return newEtcdRegistry(opts...)
 	default:
-		return NewMemoryRegistry(opts...)
+		return newMemoryRegistry(opts...)
 	}
 }

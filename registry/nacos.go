@@ -27,7 +27,7 @@ type nacosRegistry struct {
 }
 
 // NewNacosRegistry creates a new Nacos registry
-func NewNacosRegistry(opts ...Option) Registry {
+func newNacosRegistry(opts ...Option) Registry {
 	options := DefaultOptions()
 	options.Addresses = []string{"127.0.0.1:8848"}
 	for _, o := range opts {
