@@ -87,6 +87,11 @@ func New(opts ...Option) *App {
 		app.codec = codec.NewJSONCodec()
 	}
 
+	// 设置注册中心
+	if options.Registry != nil {
+		app.registry = options.Registry
+	}
+
 	// 构建服务信息
 	app.serviceInfo = &registry.Service{
 		Name:     options.Name,
