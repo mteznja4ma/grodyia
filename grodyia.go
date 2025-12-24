@@ -275,10 +275,11 @@ func (a *App) Start() error {
 			if err := a.registry.Register(svc); err != nil {
 				logger.Warning(a.opts.Name, "Registry register failed: %v", err)
 			}
-			// Watcher
-			a.registry.Watch()
 		}
 	}
+
+	// Watcher
+	a.registry.Watch()
 
 	// 发布启动事件
 	a.eventBus.Publish(a.ctx, "app.started", map[string]any{

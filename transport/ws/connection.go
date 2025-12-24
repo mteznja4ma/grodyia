@@ -130,6 +130,31 @@ func (c *Connection) IsClosed() bool {
 	return c.closed
 }
 
+// GetMeta returns metadata value by key
+func (c *Connection) GetMeta(key string) string {
+	return c.Metadata[key]
+}
+
+// SetMeta sets metadata value
+func (c *Connection) SetMeta(key, value string) {
+	c.Metadata[key] = value
+}
+
+// RemoteAddr returns client remote address
+func (c *Connection) RemoteAddr() string {
+	return c.Metadata["RemoteAddr"]
+}
+
+// Header returns request header value by key
+func (c *Connection) Header(key string) string {
+	return c.Metadata[key]
+}
+
+// Query returns raw query string
+func (c *Connection) Query() string {
+	return c.Metadata["RawQuery"]
+}
+
 // readPump reads messages from connection
 func (c *Connection) readPump(opts Options) {
 	defer c.Close()

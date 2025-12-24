@@ -359,6 +359,12 @@ func (w *etcdWatcher) watch() {
 			continue
 		}
 		w.r.services[s.Name] = append(w.r.services[s.Name], &s)
+
+		event := &Event{Type: Create, Service: &s, Timestamp: time.Now()}
+
+		if w.r.opts.WatcherOption.OnEvent != nil {
+			w.r.opts.WatcherOption.OnEvent(event)
+		}
 	}
 
 	wch := w.r.client.Watch(context.Background(), prefix, clientv3.WithPrefix())

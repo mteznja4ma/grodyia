@@ -182,6 +182,19 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	c := newConnection(connID, conn, s.opts.Codec, s)
 	c.handler = s.messageHandler
 
+	// 将请求头携带到 Metadata 方便业务扩展
+	for key, values := range r.Header {
+		if len(values) > 0 {
+			c.Metadata[key] = values[0]
+		}
+	}
+	// 添加常用的请求信息
+	c.Metadata["RemoteAddr"] = r.RemoteAddr
+	c.Metadata["RequestURI"] = r.RequestURI
+	if r.URL != nil {
+		c.Metadata["RawQuery"] = r.URL.RawQuery
+	}
+
 	s.mu.Lock()
 	s.connections[connID] = c
 	s.mu.Unlock()
