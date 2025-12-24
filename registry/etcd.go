@@ -242,7 +242,7 @@ func (r *etcdRegistry) GetService(name string) ([]*Service, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.opts.Timeout)
 	defer cancel()
 
-	prefix := etcdPrefix + "/" + r.opts.Group + "/" + r.opts.Namespace + "/" + name
+	prefix := etcdPrefix + "/" + r.opts.Group
 	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("etcd get service failed: %w", err)
@@ -343,11 +343,7 @@ type etcdWatcher struct {
 }
 
 func (w *etcdWatcher) watch() {
-	prefix := etcdPrefix + "/" + w.r.opts.Group + "/" + w.r.opts.Namespace
-	if w.service != "" {
-		prefix += "/" + w.service
-	}
-
+	prefix := etcdPrefix + "/" + w.r.opts.Group
 	watchCh := w.r.client.Watch(context.Background(), prefix, clientv3.WithPrefix())
 
 	for {
