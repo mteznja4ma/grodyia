@@ -344,13 +344,30 @@ type etcdWatcher struct {
 
 func (w *etcdWatcher) watch() {
 	prefix := etcdPrefix + "/" + w.r.opts.Group
-	watchCh := w.r.client.Watch(context.Background(), prefix, clientv3.WithPrefix())
+
+	tctx, tcancel := context.WithTimeout(context.Background(), w.r.opts.Timeout)
+	defer tcancel()
+
+	resp, err := w.r.client.Get(tctx, prefix, clientv3.WithPrefix())
+	if err != nil {
+		logger.Error("etcd", "Failed to get services: %v", err)
+		return
+	}
+	for _, kv := range resp.Kvs {
+		var s Service
+		if err := json.Unmarshal(kv.Value, &s); err != nil {
+			continue
+		}
+		w.r.services[s.Name] = append(w.r.services[s.Name], &s)
+	}
+
+	wch := w.r.client.Watch(context.Background(), prefix, clientv3.WithPrefix())
 
 	for {
 		select {
 		case <-w.done:
 			return
-		case resp, ok := <-watchCh:
+		case resp, ok := <-wch:
 			if !ok {
 				return
 			}
