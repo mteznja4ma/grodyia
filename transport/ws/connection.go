@@ -145,11 +145,6 @@ func (c *Connection) RemoteAddr() string {
 	return c.Metadata["RemoteAddr"]
 }
 
-// Header returns request header value by key
-func (c *Connection) Header(key string) string {
-	return c.Metadata[key]
-}
-
 // Query returns raw query string
 func (c *Connection) Query() string {
 	return c.Metadata["RawQuery"]
@@ -205,7 +200,7 @@ func (c *Connection) writePump(opts Options) {
 				return
 			}
 
-			if err := c.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
+			if err := c.Conn.WriteMessage(websocket.BinaryMessage, message); err != nil {
 				logger.Warning("ws", "Connection %s write error: %v", c.ID, err)
 				return
 			}
