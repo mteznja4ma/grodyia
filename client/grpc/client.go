@@ -62,7 +62,7 @@ func (c *client) connect() error {
 	}
 
 	c.conn = conn
-	logger.Info("grpc-client", "Connected to %s", c.opts.Address)
+	logger.Info("Connected to %s", c.opts.Address)
 	return nil
 }
 
@@ -106,7 +106,7 @@ func (c *client) Close() error {
 	defer c.mu.Unlock()
 
 	if c.conn != nil {
-		logger.Info("grpc-client", "Closing connection to %s", c.opts.Address)
+		logger.Info("Closing connection to %s", c.opts.Address)
 		return c.conn.Close()
 	}
 	return nil
@@ -126,7 +126,7 @@ func Call[Req, Resp any](
 	for i := 0; i <= opts.MaxRetries; i++ {
 		if i > 0 {
 			time.Sleep(opts.RetryDelay * time.Duration(i))
-			logger.Debug("grpc-client", "Retrying %s (attempt %d)", method, i+1)
+			logger.Debug("Retrying %s (attempt %d)", method, i+1)
 		}
 
 		callCtx, cancel := context.WithTimeout(ctx, opts.CallTimeout)

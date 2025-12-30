@@ -88,7 +88,7 @@ func (r *etcdRegistry) Connect() error {
 	r.client = client
 	r.running = true
 
-	logger.Info("etcd", "Connected to etcd at %v", r.opts.Addresses)
+	logger.Info("Connected to etcd at %v", r.opts.Addresses)
 	return nil
 }
 
@@ -106,7 +106,7 @@ func (r *etcdRegistry) Close() error {
 	// Revoke all leases (this will delete the keys)
 	for key, leaseID := range r.registered {
 		r.client.Revoke(context.Background(), leaseID)
-		logger.Debug("etcd", "Revoked lease for %s", key)
+		logger.Debug("Revoked lease for %s", key)
 	}
 
 	for _, w := range r.watchers {
@@ -165,11 +165,11 @@ func (r *etcdRegistry) Register(s *Service) error {
 				return
 			case ka, ok := <-keepAliveCh:
 				if !ok {
-					logger.Warning("etcd", "Keep alive channel closed for %s", key)
+					logger.Warning("Keep alive channel closed for %s", key)
 					return
 				}
 				if ka == nil {
-					logger.Warning("etcd", "Keep alive response nil for %s", key)
+					logger.Warning("Keep alive response nil for %s", key)
 					return
 				}
 			}
@@ -191,7 +191,7 @@ func (r *etcdRegistry) Register(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Create, Service: s, Timestamp: time.Now()})
-	logger.Info("etcd", "Registered service: %s/%s", s.Name, s.ID)
+	logger.Info("Registered service: %s/%s", s.Name, s.ID)
 	return nil
 }
 
@@ -227,7 +227,7 @@ func (r *etcdRegistry) Deregister(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Delete, Service: s, Timestamp: time.Now()})
-	logger.Info("etcd", "Deregistered service: %s/%s", s.Name, s.ID)
+	logger.Info("Deregistered service: %s/%s", s.Name, s.ID)
 	return nil
 }
 
@@ -328,7 +328,7 @@ func (r *etcdRegistry) notify(event *Event) {
 			select {
 			case w.events <- event:
 			default:
-				logger.Warning("etcd", "Watcher event channel full, dropping event for service: %s", event.Service.Name)
+				logger.Warning("Watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}
@@ -350,7 +350,7 @@ func (w *etcdWatcher) watch() {
 
 	resp, err := w.r.client.Get(tctx, prefix, clientv3.WithPrefix())
 	if err != nil {
-		logger.Error("etcd", "Failed to get services: %v", err)
+		logger.Error("Failed to get services: %v", err)
 		return
 	}
 	for _, kv := range resp.Kvs {
@@ -410,7 +410,7 @@ func (w *etcdWatcher) watch() {
 				select {
 				case w.events <- event:
 				default:
-					logger.Warning("etcd", "Watcher event channel full, dropping event for service: %s", s.Name)
+					logger.Warning("Watcher event channel full, dropping event for service: %s", s.Name)
 				}
 			}
 		}

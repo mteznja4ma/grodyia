@@ -272,12 +272,12 @@ func main() {
     players := make(map[string]*ws.Connection)
 
     gameServer.OnConnect(func(conn *ws.Connection) {
-        logger.Info("game", "Player connected: %s", conn.ID)
+        logger.Info("Player connected: %s", conn.ID)
     })
 
     gameServer.OnDisconnect(func(conn *ws.Connection) {
         delete(players, conn.ID)
-        logger.Info("game", "Player disconnected: %s", conn.ID)
+        logger.Info("Player disconnected: %s", conn.ID)
     })
 
     gameServer.OnMessage(func(ctx context.Context, msg *ws.Message) error {
@@ -302,12 +302,12 @@ func main() {
 
     // 生命周期
     app.BeforeStart(func(a *grodyia.App) error {
-        logger.Info("game", "Initializing...")
+        logger.Info("Initializing...")
         return nil
     })
 
     app.AfterStart(func(a *grodyia.App) error {
-        logger.Info("game", "Server ready!")
+        logger.Info("Server ready!")
         return nil
     })
 

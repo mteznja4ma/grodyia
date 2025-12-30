@@ -88,7 +88,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// 非阻塞启动
 	go func() {
-		logger.Info("http", "HTTP server starting on %s", s.opts.Address)
+		logger.Info("HTTP server starting on %s", s.opts.Address)
 		var err error
 		if s.opts.TLSCert != "" && s.opts.TLSKey != "" {
 			err = s.server.ListenAndServeTLS(s.opts.TLSCert, s.opts.TLSKey)
@@ -96,7 +96,7 @@ func (s *Server) Start(ctx context.Context) error {
 			err = s.server.ListenAndServe()
 		}
 		if err != nil && err != http.ErrServerClosed {
-			logger.Error("http", "Server error: %v", err)
+			logger.Error("Server error: %v", err)
 		}
 	}()
 
@@ -109,14 +109,14 @@ func (s *Server) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	logger.Info("http", "HTTP server stopping...")
+	logger.Info("HTTP server stopping...")
 	s.healthStatus.SetNoReady()
 
 	if err := s.server.Shutdown(ctx); err != nil {
-		logger.Warning("http", "Shutdown error: %v, forcing close", err)
+		logger.Warning("Shutdown error: %v, forcing close", err)
 		return s.server.Close()
 	}
-	logger.Info("http", "HTTP server stopped")
+	logger.Info("HTTP server stopped")
 
 	return nil
 }

@@ -183,7 +183,7 @@ func (r *memoryRegistry) notify(event *Event) {
 			select {
 			case w.events <- event:
 			default:
-				logger.Warning("memory", "Watcher event channel full, dropping event for service: %s", event.Service.Name)
+				logger.Warning("Watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}

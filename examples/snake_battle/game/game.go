@@ -253,10 +253,10 @@ func (r *Room) Start() {
 func (r *Room) Stop() {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("game", "Panic during room stop: %v", r)
+			logger.Error("Panic during room stop: %v", r)
 		}
 	}()
-	logger.Info("game", "Stopping room %s", r.ID)
+	logger.Info("Stopping room %s", r.ID)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

@@ -102,7 +102,7 @@ func (r *consulRegistry) Connect() error {
 	// Start health check loop
 	go r.healthCheckLoop()
 
-	logger.Info("consul", "Connected to Consul at %s", r.opts.Addresses[0])
+	logger.Info("Connected to Consul at %s", r.opts.Addresses[0])
 	return nil
 }
 
@@ -160,7 +160,7 @@ func (r *consulRegistry) Register(s *Service) error {
 	// Pass initial health check
 	checkID := fmt.Sprintf("service:%s", s.ID)
 	if err := r.client.Agent().PassTTL(checkID, "initial registration"); err != nil {
-		logger.Warning("consul", "Failed to pass initial TTL for %s: %v", s.ID, err)
+		logger.Warning("Failed to pass initial TTL for %s: %v", s.ID, err)
 	}
 
 	s.LastSeen = time.Now()
@@ -182,7 +182,7 @@ func (r *consulRegistry) Register(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Create, Service: s, Timestamp: time.Now()})
-	logger.Info("consul", "Registered service: %s/%s @ %s", s.Name, s.ID, s.Address)
+	logger.Info("Registered service: %s/%s @ %s", s.Name, s.ID, s.Address)
 	return nil
 }
 
@@ -219,7 +219,7 @@ func (r *consulRegistry) Deregister(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Delete, Service: s, Timestamp: time.Now()})
-	logger.Info("consul", "Deregistered service: %s/%s", s.Name, s.ID)
+	logger.Info("Deregistered service: %s/%s", s.Name, s.ID)
 	return nil
 }
 
@@ -339,7 +339,7 @@ func (r *consulRegistry) notify(event *Event) {
 			select {
 			case w.events <- event:
 			default:
-				logger.Warning("consul", "Watcher event channel full, dropping event for service: %s", event.Service.Name)
+				logger.Warning("Watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}
@@ -362,7 +362,7 @@ func (r *consulRegistry) healthCheckLoop() {
 			for _, s := range services {
 				checkID := fmt.Sprintf("service:%s", s.ID)
 				if err := r.client.Agent().PassTTL(checkID, "health check"); err != nil {
-					logger.Warning("consul", "Health check failed for %s: %v", s.ID, err)
+					logger.Warning("Health check failed for %s: %v", s.ID, err)
 				}
 			}
 		}
@@ -422,7 +422,7 @@ func (w *consulWatcher) watch() {
 				select {
 				case w.events <- event:
 				default:
-					logger.Warning("consul", "Watcher event channel full, dropping update for service: %s", s.Name)
+					logger.Warning("Watcher event channel full, dropping update for service: %s", s.Name)
 				}
 			}
 		}

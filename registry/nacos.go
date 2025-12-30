@@ -104,7 +104,7 @@ func (r *nacosRegistry) Connect() error {
 	r.client = client
 	r.running = true
 
-	logger.Info("nacos", "Connected to Nacos at %v", r.opts.Addresses)
+	logger.Info("Connected to Nacos at %v", r.opts.Addresses)
 	return nil
 }
 
@@ -184,7 +184,7 @@ func (r *nacosRegistry) Register(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Create, Service: s, Timestamp: time.Now()})
-	logger.Info("nacos", "Registered service: %s/%s @ %s", s.Name, s.ID, s.Address)
+	logger.Info("Registered service: %s/%s @ %s", s.Name, s.ID, s.Address)
 	return nil
 }
 
@@ -230,7 +230,7 @@ func (r *nacosRegistry) Deregister(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Delete, Service: s, Timestamp: time.Now()})
-	logger.Info("nacos", "Deregistered service: %s/%s", s.Name, s.ID)
+	logger.Info("Deregistered service: %s/%s", s.Name, s.ID)
 	return nil
 }
 
@@ -339,7 +339,7 @@ func (r *nacosRegistry) Watch() (Watcher, error) {
 					select {
 					case w.events <- event:
 					default:
-						logger.Warning("nacos", "Watcher event channel full, dropping update for service: %s", s.Name)
+						logger.Warning("Watcher event channel full, dropping update for service: %s", s.Name)
 					}
 				}
 			},
@@ -359,7 +359,7 @@ func (r *nacosRegistry) notify(event *Event) {
 			select {
 			case w.events <- event:
 			default:
-				logger.Warning("nacos", "Watcher event channel full, dropping event for service: %s", event.Service.Name)
+				logger.Warning("Watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}

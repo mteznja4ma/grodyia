@@ -101,9 +101,9 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// 非阻塞启动
 	go func() {
-		logger.Info("grpc", "gRPC server starting on %s", s.options.Address)
+		logger.Info("gRPC server starting on %s", s.options.Address)
 		if err := s.server.Serve(ln); err != nil {
-			logger.Error("grpc", "Server error: %v", err)
+			logger.Error("Server error: %v", err)
 		}
 	}()
 
@@ -116,7 +116,7 @@ func (s *Server) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	logger.Info("grpc", "gRPC server stopping...")
+	logger.Info("gRPC server stopping...")
 	s.healthStatus.SetNoReady()
 
 	done := make(chan struct{})
@@ -127,9 +127,9 @@ func (s *Server) Stop(ctx context.Context) error {
 
 	select {
 	case <-done:
-		logger.Info("grpc", "Server stopped gracefully")
+		logger.Info("Server stopped gracefully")
 	case <-time.After(time.Second * 10):
-		logger.Warning("grpc", "Server force stopping")
+		logger.Warning("Server force stopping")
 		s.server.Stop()
 	}
 
@@ -160,7 +160,7 @@ func (s *Server) recoveryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("grpc", "Panic recovered: %v", r)
+				logger.Error("Panic recovered: %v", r)
 				err = fmt.Errorf("internal error")
 			}
 		}()
@@ -175,9 +175,9 @@ func (s *Server) loggingInterceptor() grpc.UnaryServerInterceptor {
 		duration := time.Since(start)
 
 		if err != nil {
-			logger.Warning("grpc", "%s | %v | error: %v", info.FullMethod, duration, err)
+			logger.Warning("%s | %v | error: %v", info.FullMethod, duration, err)
 		} else {
-			logger.Debug("grpc", "%s | %v", info.FullMethod, duration)
+			logger.Debug("%s | %v", info.FullMethod, duration)
 		}
 
 		return resp, err
@@ -188,7 +188,7 @@ func (s *Server) streamRecoveryInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("grpc", "Stream panic recovered: %v", r)
+				logger.Error("Stream panic recovered: %v", r)
 				err = fmt.Errorf("internal error")
 			}
 		}()

@@ -212,7 +212,7 @@ func (a *App) AfterStop(fn func(*App) error) *App {
 // Run 启动应用并阻塞等待信号
 func (a *App) Run() error {
 	if err := a.Start(); err != nil {
-		return err
+		panic(err)
 	}
 
 	// 等待信号
@@ -221,7 +221,7 @@ func (a *App) Run() error {
 
 	select {
 	case sig := <-sigCh:
-		logger.Info(a.opts.Name, "Received signal: %v", sig)
+		logger.Info("Received signal: %v", sig)
 	case <-a.ctx.Done():
 	}
 
@@ -238,7 +238,7 @@ func (a *App) Start() error {
 	a.running = true
 	a.mu.Unlock()
 
-	logger.Info(a.opts.Name, "Starting %s v%s (Grodyia %s)", a.opts.Name, a.opts.Version, Version)
+	logger.Info("Starting %s v%s (Grodyia %s)", a.opts.Name, a.opts.Version, Version)
 
 	// 执行启动前钩子
 	for _, fn := range a.beforeStart {
@@ -250,9 +250,9 @@ func (a *App) Start() error {
 	// 连接注册中心
 	if a.registry != nil {
 		if err := a.registry.Connect(); err != nil {
-			logger.Warning(a.opts.Name, "Registry connect failed: %v", err)
+			logger.Warning("Registry connect failed: %v", err)
 		} else {
-			logger.Info(a.opts.Name, "Connected to registry (%s)", a.registry.Type())
+			logger.Info("Connected to registry (%s)", a.registry.Type())
 		}
 	}
 
@@ -261,7 +261,7 @@ func (a *App) Start() error {
 		if err := t.Start(a.ctx); err != nil {
 			return fmt.Errorf("transport %s start error: %w", t.Name(), err)
 		}
-		logger.Info(a.opts.Name, "Transport %s listening on %s", t.Name(), t.Addr())
+		logger.Info("Transport %s listening on %s", t.Name(), t.Addr())
 
 		// 注册到注册中心
 		if a.registry != nil {
@@ -273,13 +273,15 @@ func (a *App) Start() error {
 				Metadata: t.Metadata(),
 			}
 			if err := a.registry.Register(svc); err != nil {
-				logger.Warning(a.opts.Name, "Registry register failed: %v", err)
+				logger.Warning("Registry register failed: %v", err)
 			}
 		}
 	}
 
 	// Watcher
-	a.registry.Watch()
+	if a.registry != nil {
+		a.registry.Watch()
+	}
 
 	// 发布启动事件
 	a.eventBus.Publish(a.ctx, "app.started", map[string]any{
@@ -291,11 +293,11 @@ func (a *App) Start() error {
 	// 执行启动后钩子
 	for _, fn := range a.afterStart {
 		if err := fn(a); err != nil {
-			logger.Warning(a.opts.Name, "After start hook error: %v", err)
+			logger.Warning("After start hook error: %v", err)
 		}
 	}
 
-	logger.Info(a.opts.Name, "Application started successfully")
+	logger.Info("Application started successfully")
 	return nil
 }
 
@@ -303,7 +305,7 @@ func (a *App) Start() error {
 func (a *App) Stop() error {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error(a.opts.Name, "Panic during application stop: %v", r)
+			logger.Error("Panic during application stop: %v", r)
 		}
 	}()
 	a.mu.Lock()
@@ -314,7 +316,7 @@ func (a *App) Stop() error {
 	a.running = false
 	a.mu.Unlock()
 
-	logger.Info(a.opts.Name, "Stopping application...")
+	logger.Info("Stopping application...")
 
 	// 执行停止前钩子
 	for _, fn := range a.beforeStop {
@@ -344,9 +346,9 @@ func (a *App) Stop() error {
 	for _, t := range a.transports {
 		if err := t.Stop(a.ctx); err != nil {
 			lastErr = err
-			logger.Warning(a.opts.Name, "Transport %s stop error: %v", t.Name(), err)
+			logger.Warning("Transport %s stop error: %v", t.Name(), err)
 		} else {
-			logger.Info(a.opts.Name, "Transport %s stopped", t.Name())
+			logger.Info("Transport %s stopped", t.Name())
 		}
 	}
 
@@ -359,11 +361,11 @@ func (a *App) Stop() error {
 	// 执行停止后钩子
 	for _, fn := range a.afterStop {
 		if err := fn(a); err != nil {
-			logger.Warning(a.opts.Name, "After stop hook error: %v", err)
+			logger.Warning("After stop hook error: %v", err)
 		}
 	}
 
-	logger.Info(a.opts.Name, "Application stopped")
+	logger.Info("Application stopped")
 	return lastErr
 }
 

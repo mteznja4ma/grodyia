@@ -114,10 +114,10 @@ func (s *Server) Start(ctx context.Context) error {
 	// 非阻塞启动
 	go func() {
 		var err error
-		logger.Info("ws", "WebSocket server starting on %s%s", s.opts.Address, s.opts.Path)
+		logger.Info("WebSocket server starting on %s%s", s.opts.Address, s.opts.Path)
 		err = s.server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			logger.Error("ws", "Server error: %v", err)
+			logger.Error("Server error: %v", err)
 		}
 	}()
 
@@ -130,7 +130,7 @@ func (s *Server) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	logger.Info("ws", "WebSocket server stopping...")
+	logger.Info("WebSocket server stopping...")
 	s.healthStatus.SetNoReady()
 
 	// 设置停止标志，拒绝新连接
@@ -153,10 +153,10 @@ func (s *Server) Stop(ctx context.Context) error {
 	}
 
 	if err := s.server.Shutdown(ctx); err != nil {
-		logger.Warning("ws", "Shutdown error: %v, forcing close", err)
+		logger.Warning("Shutdown error: %v, forcing close", err)
 		return s.server.Close()
 	}
-	logger.Info("ws", "WebSocket server stopped")
+	logger.Info("WebSocket server stopped")
 
 	return nil
 }
@@ -174,7 +174,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logger.Warning("ws", "Upgrade failed: %v", err)
+		logger.Warning("Upgrade failed: %v", err)
 		return
 	}
 
@@ -199,7 +199,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	s.connections[connID] = c
 	s.mu.Unlock()
 
-	logger.Debug("ws", "New connection: %s", connID)
+	logger.Debug("New connection: %s", connID)
 
 	if s.onConnect != nil {
 		s.onConnect(c)
@@ -218,7 +218,7 @@ func (s *Server) removeConnection(id string) {
 	s.mu.Lock()
 	delete(s.connections, id)
 	s.mu.Unlock()
-	logger.Debug("ws", "Connection removed: %s", id)
+	logger.Debug("Connection removed: %s", id)
 }
 
 // Connections 返回所有连接

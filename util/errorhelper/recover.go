@@ -6,8 +6,12 @@ import (
 	"github.com/mteznja4ma/grodyia/logger"
 )
 
+// Recover
+/*
+ * 恢复错误
+ */
 func Recover() {
 	if err := recover(); err != nil {
-		logger.Error("ErrorHelper", "Recover Error=[%v], Stack=[%v]\r\n", err, string(debug.Stack()))
+		logger.Error("Recover Error=[%v], Stack=[%v]\r\n", err, string(debug.Stack()))
 	}
 }

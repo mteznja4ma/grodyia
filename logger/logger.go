@@ -28,12 +28,11 @@ const (
 )
 
 type Logger struct {
-	File      string
-	Line      int
-	Classname string
-	Level     int
-	LogStr    string
-	TimeNs    int64
+	File   string
+	Line   int
+	Level  int
+	LogStr string
+	TimeNs int64
 }
 
 var (
@@ -182,7 +181,6 @@ func TryE(pathName string) {
 
 /**
  * 日志输出
- * @param [classname] 类名
  * @param [file] 文件
  * @param [format] 格式
  * @param [line] 错误行数
@@ -190,7 +188,7 @@ func TryE(pathName string) {
  * @param [a] 参数
  *
  **/
-func printLog(classname, file, format string, line, level int, a ...any) {
+func printLog(file, format string, line, level int, a ...any) {
 	dir, _ := util.GetCurrentPath()
 	dir = path.Join(dir, "log")
 	if contextLogger != nil {
@@ -231,12 +229,11 @@ func printLog(classname, file, format string, line, level int, a ...any) {
 
 	// save logInfo
 	logInfo := Logger{
-		File:      file,
-		Line:      line,
-		Classname: classname,
-		Level:     level,
-		LogStr:    fmt.Sprintf(format, a...),
-		TimeNs:    time.Now().UnixNano(),
+		File:   file,
+		Line:   line,
+		Level:  level,
+		LogStr: fmt.Sprintf(format, a...),
+		TimeNs: time.Now().UnixNano(),
 	}
 	if cb != nil {
 		cb(logInfo)
@@ -253,73 +250,67 @@ func printLog(classname, file, format string, line, level int, a ...any) {
 // Trace
 /*
  * 追踪级别
- * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
  */
-func Trace(classname, format string, a ...any) {
+func Trace(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(classname, file, format, line, TraceLevel, a...)
+	printLog(file, format, line, TraceLevel, a...)
 }
 
 // Debug
 /*
  * 调试级别
- * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
  */
-func Debug(classname, format string, a ...any) {
+func Debug(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(classname, file, format, line, DebugLevel, a...)
+	printLog(file, format, line, DebugLevel, a...)
 }
 
 // Info
 /*
  * 正常级别
- * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
  */
-func Info(classname, format string, a ...any) {
+func Info(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(classname, file, format, line, InfoLevel, a...)
+	printLog(file, format, line, InfoLevel, a...)
 }
 
 // Warning
 /*
  * 警告级别
- * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
  */
-func Warning(classname, format string, a ...any) {
+func Warning(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(classname, file, format, line, WarningLevel, a...)
+	printLog(file, format, line, WarningLevel, a...)
 }
 
 // Error
 /*
  * 错误级别
- * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
  */
-func Error(classname, format string, a ...any) {
+func Error(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(classname, file, format, line, ErrorLevel, a...)
+	printLog(file, format, line, ErrorLevel, a...)
 }
 
 // Fatal
 /*
  * 失败级别
- * @param [classname] 类名
  * @param [format] 格式
  * @param [a] 参数
  */
-func Fatal(classname, format string, a ...any) {
+func Fatal(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(classname, file, format, line, FatalLevel, a...)
+	printLog(file, format, line, FatalLevel, a...)
 	time.Sleep(time.Second / 2)
 	os.Exit(1)
 }

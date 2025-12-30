@@ -120,7 +120,7 @@ func (c *client) connect() error {
 	conn, resp, err := c.dialer.Dial(c.opts.URL, headers)
 	if err != nil {
 		if resp != nil {
-			logger.Warning("ws-client", "Connect failed with status %d: %v", resp.StatusCode, err)
+			logger.Warning("Connect failed with status %d: %v", resp.StatusCode, err)
 		}
 		return err
 	}
@@ -129,7 +129,7 @@ func (c *client) connect() error {
 	c.connected = true
 	c.reconnectCount = 0
 
-	logger.Info("ws-client", "Connected to %s", c.opts.URL)
+	logger.Info("Connected to %s", c.opts.URL)
 
 	// Start read/write pumps
 	go c.readPump()
@@ -161,7 +161,7 @@ func (c *client) Close() error {
 	c.connected = false
 	c.mu.Unlock()
 
-	logger.Info("ws-client", "Client closed")
+	logger.Info("Client closed")
 	return nil
 }
 
@@ -250,7 +250,7 @@ func (c *client) readPump() {
 		messageType, data, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				logger.Warning("ws-client", "Read error: %v", err)
+				logger.Warning("Read error: %v", err)
 			}
 			c.handleDisconnect(err)
 			return
@@ -262,7 +262,7 @@ func (c *client) readPump() {
 				Data: data,
 			}
 			if err := c.onMessage(msg); err != nil {
-				logger.Warning("ws-client", "Message handler error: %v", err)
+				logger.Warning("Message handler error: %v", err)
 			}
 		}
 	}
@@ -284,7 +284,7 @@ func (c *client) writePump() {
 			}
 
 			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
-				logger.Warning("ws-client", "Write error: %v", err)
+				logger.Warning("Write error: %v", err)
 				return
 			}
 
@@ -314,7 +314,7 @@ func (c *client) handleDisconnect(err error) {
 		return
 	}
 
-	logger.Warning("ws-client", "Disconnected from %s", c.opts.URL)
+	logger.Warning("Disconnected from %s", c.opts.URL)
 
 	// Call disconnect handler
 	if c.onDisconnect != nil {
@@ -357,7 +357,7 @@ func (c *client) reconnect() {
 		}
 
 		if c.opts.MaxReconnectAttempts > 0 && count >= c.opts.MaxReconnectAttempts {
-			logger.Error("ws-client", "Max reconnect attempts reached")
+			logger.Error("Max reconnect attempts reached")
 			return
 		}
 
@@ -365,12 +365,12 @@ func (c *client) reconnect() {
 		c.reconnectCount++
 		c.mu.Unlock()
 
-		logger.Info("ws-client", "Reconnecting... (attempt %d)", count+1)
+		logger.Info("Reconnecting... (attempt %d)", count+1)
 
 		time.Sleep(c.opts.ReconnectInterval)
 
 		if err := c.connect(); err != nil {
-			logger.Warning("ws-client", "Reconnect failed: %v", err)
+			logger.Warning("Reconnect failed: %v", err)
 			continue
 		}
 
