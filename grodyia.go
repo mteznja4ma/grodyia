@@ -62,9 +62,9 @@ type Transport interface {
 	// Metadata 传输层元数据
 	Metadata() map[string]string
 	// Start 启动 (非阻塞)
-	Start(ctx context.Context) error
-	// Stop 停止
-	Stop(ctx context.Context) error
+	Start() error
+	// Stop 停止 (使用内部超时)
+	Stop() error
 	// Addr 监听地址
 	Addr() string
 }
@@ -265,7 +265,7 @@ func (a *App) Start() error {
 
 	// 启动所有传输层
 	for _, t := range a.transports {
-		if err := t.Start(a.ctx); err != nil {
+		if err := t.Start(); err != nil {
 			return fmt.Errorf("transport %s start error: %w", t.Name(), err)
 		}
 		logger.Info("Transport %s listening on %s", t.Name(), t.Addr())
@@ -312,11 +312,6 @@ func (a *App) Start() error {
 
 // Stop 停止应用
 func (a *App) Stop() error {
-	defer func() {
-		if r := recover(); r != nil {
-			logger.Error("Panic during application stop: %v", r)
-		}
-	}()
 	a.mu.Lock()
 	if !a.running {
 		a.mu.Unlock()
@@ -339,30 +334,20 @@ func (a *App) Stop() error {
 
 	var lastErr error
 
-	// 从注册中心注销 (使用与注册时相同的 ID)
+	// 关闭注册中心 (Close 内部会自动注销所有已注册的服务)
 	if a.registry != nil {
-		for _, t := range a.transports {
-			svc := &registry.Service{
-				ID:      t.ID(),
-				Name:    t.Name(),
-				Address: t.Addr(),
-			}
-			if err := a.registry.Deregister(svc); err != nil {
-				logger.Warning("Registry deregister failed for %s: %v", t.Name(), err)
-			} else {
-				logger.Info("Deregistered service: %s/%s", t.Name(), t.ID())
-			}
+		if err := a.registry.Close(); err != nil {
+			logger.Warning("Registry close error: %v", err)
+		} else {
+			logger.Info("Registry closed and services deregistered")
 		}
-		a.registry.Close()
 	}
 
-	// 停止所有传输层
+	// 停止所有传输层 (各 transport 内部处理超时)
 	for _, t := range a.transports {
-		if err := t.Stop(a.ctx); err != nil {
+		if err := t.Stop(); err != nil {
 			lastErr = err
 			logger.Warning("Transport %s stop error: %v", t.Name(), err)
-		} else {
-			logger.Info("Transport %s stopped", t.Name())
 		}
 	}
 

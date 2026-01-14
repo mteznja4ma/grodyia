@@ -75,7 +75,7 @@ func (s *Server) Register(fn RegisterFn) *Server {
 }
 
 // Start 启动服务器 (非阻塞)
-func (s *Server) Start(ctx context.Context) error {
+func (s *Server) Start() error {
 	ln, err := net.Listen("tcp", s.options.Address)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", s.options.Address, err)
@@ -162,8 +162,8 @@ func (s *Server) loadTLSCredentials() (credentials.TransportCredentials, error) 
 	return credentials.NewTLS(tlsConfig), nil
 }
 
-// Stop 停止服务器
-func (s *Server) Stop(ctx context.Context) error {
+// Stop 停止服务器 (使用内部 StopTimeout)
+func (s *Server) Stop() error {
 	if s.server == nil {
 		return nil
 	}
@@ -179,9 +179,9 @@ func (s *Server) Stop(ctx context.Context) error {
 
 	select {
 	case <-done:
-		logger.Info("Server stopped gracefully")
-	case <-ctx.Done():
-		logger.Warning("Server force stopping due to context cancellation")
+		logger.Info("gRPC server stopped gracefully")
+	case <-time.After(time.Second * 10):
+		logger.Warning("gRPC server force stopping due to timeout")
 		s.server.Stop()
 	}
 

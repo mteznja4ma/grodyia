@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -84,7 +85,7 @@ func (s *Server) Addr() string {
 }
 
 // Start 启动服务器 (非阻塞)
-func (s *Server) Start(ctx context.Context) error {
+func (s *Server) Start() error {
 	mux := http.NewServeMux()
 
 	// WebSocket endpoint
@@ -125,7 +126,7 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // Stop 停止服务器
-func (s *Server) Stop(ctx context.Context) error {
+func (s *Server) Stop() error {
 	if s.server == nil {
 		return nil
 	}
@@ -136,10 +137,6 @@ func (s *Server) Stop(ctx context.Context) error {
 	// 设置停止标志，拒绝新连接
 	s.mu.Lock()
 	s.stopping = true
-	s.mu.Unlock()
-
-	// 复制连接列表，避免在持有锁时调用 Close 导致死锁
-	s.mu.Lock()
 	conns := make([]*Connection, 0, len(s.connections))
 	for _, conn := range s.connections {
 		conns = append(conns, conn)
@@ -147,16 +144,19 @@ func (s *Server) Stop(ctx context.Context) error {
 	s.connections = make(map[string]*Connection)
 	s.mu.Unlock()
 
-	// 在锁外关闭所有连接
+	// 关闭所有连接
 	for _, conn := range conns {
 		conn.Close()
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
 	if err := s.server.Shutdown(ctx); err != nil {
-		logger.Warning("Shutdown error: %v, forcing close", err)
+		logger.Warning("WebSocket server shutdown timeout, forcing close: %v", err)
 		return s.server.Close()
 	}
-	logger.Info("WebSocket server stopped")
+	logger.Info("WebSocket server stopped gracefully")
 
 	return nil
 }

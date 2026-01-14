@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/mteznja4ma/grodyia/health"
 	"github.com/mteznja4ma/grodyia/logger"
@@ -66,7 +67,7 @@ func (s *Server) Router() *Router {
 }
 
 // Start 启动服务器 (非阻塞)
-func (s *Server) Start(ctx context.Context) error {
+func (s *Server) Start() error {
 	// 注册健康检查端点
 	s.router.GET("/health", func(c *Context) error {
 		if s.healthStatus.IsReady() {
@@ -104,7 +105,7 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // Stop 停止服务器
-func (s *Server) Stop(ctx context.Context) error {
+func (s *Server) Stop() error {
 	if s.server == nil {
 		return nil
 	}
@@ -112,11 +113,14 @@ func (s *Server) Stop(ctx context.Context) error {
 	logger.Info("HTTP server stopping...")
 	s.healthStatus.SetNoReady()
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
 	if err := s.server.Shutdown(ctx); err != nil {
-		logger.Warning("Shutdown error: %v, forcing close", err)
+		logger.Warning("HTTP server shutdown timeout, forcing close: %v", err)
 		return s.server.Close()
 	}
-	logger.Info("HTTP server stopped")
+	logger.Info("HTTP server stopped gracefully")
 
 	return nil
 }
