@@ -77,7 +77,7 @@ func (r *memoryRegistry) Close() error {
 
 	// 停止 watchers
 	for _, w := range watchers {
-		w.close()
+		w.once.Do(func() { close(w.done) })
 	}
 
 	return nil
@@ -239,6 +239,7 @@ type memoryWatcher struct {
 	done    chan struct{}
 	service string
 	r       *memoryRegistry
+	once    sync.Once
 }
 
 func (w *memoryWatcher) Next() (*Event, error) {
@@ -255,14 +256,5 @@ func (w *memoryWatcher) Stop() {
 	delete(w.r.watchers, w.id)
 	w.r.mu.Unlock()
 
-	w.close()
-}
-
-// close 关闭 watcher（不获取锁，供内部使用）
-func (w *memoryWatcher) close() {
-	select {
-	case <-w.done:
-	default:
-		close(w.done)
-	}
+	w.once.Do(func() { close(w.done) })
 }

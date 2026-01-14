@@ -155,17 +155,12 @@ func (r *consulRegistry) Close() error {
 	for _, w := range r.watchers {
 		watchers = append(watchers, w)
 	}
-	r.watchers = make(map[int]*consulWatcher)
+	r.watchers = make(map[int]*consulWatcher) // watchers 会通过 stopCh 自动退出
 	r.mu.Unlock()
 
 	// 注销服务
 	for _, s := range registered {
 		r.deregisterService(s)
-	}
-
-	// 停止 watchers
-	for _, w := range watchers {
-		w.close()
 	}
 
 	return nil
@@ -421,12 +416,15 @@ type consulWatcher struct {
 	service   string
 	r         *consulRegistry
 	lastIndex uint64
+	once      sync.Once
 }
 
 func (w *consulWatcher) watch() {
 	for {
 		select {
 		case <-w.done:
+			return
+		case <-w.r.stopCh:
 			return
 		default:
 		}
@@ -488,14 +486,5 @@ func (w *consulWatcher) Stop() {
 	delete(w.r.watchers, w.id)
 	w.r.mu.Unlock()
 
-	w.close()
-}
-
-// close 关闭 watcher（不获取锁，供内部使用）
-func (w *consulWatcher) close() {
-	select {
-	case <-w.done:
-	default:
-		close(w.done)
-	}
+	w.once.Do(func() { close(w.done) })
 }

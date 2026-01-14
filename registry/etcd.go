@@ -111,18 +111,13 @@ func (r *etcdRegistry) Close() error {
 	r.running = false
 	close(r.stopCh)
 
-	// 复制需要操作的数据，避免在持有锁时执行阻塞操作
+	// 复制需要操作的数据
 	registered := make(map[string]clientv3.LeaseID)
 	for k, v := range r.registered {
 		registered[k] = v
 	}
 	r.registered = make(map[string]clientv3.LeaseID)
-
-	watchers := make([]*etcdWatcher, 0, len(r.watchers))
-	for _, w := range r.watchers {
-		watchers = append(watchers, w)
-	}
-	r.watchers = make(map[int]*etcdWatcher)
+	r.watchers = make(map[int]*etcdWatcher) // watchers 会通过 stopCh 自动退出
 
 	client := r.client
 	r.mu.Unlock()
@@ -137,11 +132,6 @@ func (r *etcdRegistry) Close() error {
 		} else {
 			logger.Debug("Revoked lease for %s", key)
 		}
-	}
-
-	// 停止 watchers（不再需要获取锁）
-	for _, w := range watchers {
-		w.close()
 	}
 
 	if client != nil {
@@ -368,9 +358,11 @@ func (r *etcdRegistry) notify(event *Event) {
 type etcdWatcher struct {
 	id      int
 	events  chan *Event
-	done    chan struct{}
+	done    chan struct{} // 单独停止此 watcher
 	service string
 	r       *etcdRegistry
+	once    sync.Once
+	// 注：watcher 同时监听 w.done 和 w.r.stopCh，任一关闭都会退出
 }
 
 func (w *etcdWatcher) watch() {
@@ -405,6 +397,8 @@ func (w *etcdWatcher) watch() {
 	for {
 		select {
 		case <-w.done:
+			return
+		case <-w.r.stopCh:
 			return
 		case resp, ok := <-wch:
 			if !ok {
@@ -465,14 +459,5 @@ func (w *etcdWatcher) Stop() {
 	delete(w.r.watchers, w.id)
 	w.r.mu.Unlock()
 
-	w.close()
-}
-
-// close 关闭 watcher（不获取锁，供内部使用）
-func (w *etcdWatcher) close() {
-	select {
-	case <-w.done:
-	default:
-		close(w.done)
-	}
+	w.once.Do(func() { close(w.done) })
 }

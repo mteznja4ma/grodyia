@@ -136,9 +136,15 @@ func (r *nacosRegistry) Close() error {
 		r.deregisterInstance(s)
 	}
 
-	// 停止 watchers
+	// 停止 watchers (需要 Unsubscribe)
 	for _, w := range watchers {
-		w.close()
+		if w.subscribed && client != nil && w.service != "" {
+			client.Unsubscribe(&vo.SubscribeParam{
+				ServiceName: w.service,
+				GroupName:   r.opts.Group,
+			})
+		}
+		w.once.Do(func() { close(w.done) })
 	}
 
 	// Shutdown client
@@ -385,6 +391,7 @@ type nacosWatcher struct {
 	service    string
 	r          *nacosRegistry
 	subscribed bool
+	once       sync.Once
 }
 
 func (w *nacosWatcher) Next() (*Event, error) {
@@ -411,15 +418,5 @@ func (w *nacosWatcher) Stop() {
 		})
 	}
 
-	w.close()
-}
-
-// close 关闭 watcher（不获取锁，供内部使用）
-func (w *nacosWatcher) close() {
-
-	select {
-	case <-w.done:
-	default:
-		close(w.done)
-	}
+	w.once.Do(func() { close(w.done) })
 }
