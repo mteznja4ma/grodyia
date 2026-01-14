@@ -103,27 +103,49 @@ func (r *etcdRegistry) Connect() error {
 
 func (r *etcdRegistry) Close() error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if !r.running {
+		r.mu.Unlock()
 		return nil
 	}
 
 	r.running = false
 	close(r.stopCh)
 
-	// Revoke all leases (this will delete the keys)
-	for key, leaseID := range r.registered {
-		r.client.Revoke(context.Background(), leaseID)
-		logger.Debug("Revoked lease for %s", key)
+	// 复制需要操作的数据，避免在持有锁时执行阻塞操作
+	registered := make(map[string]clientv3.LeaseID)
+	for k, v := range r.registered {
+		registered[k] = v
 	}
+	r.registered = make(map[string]clientv3.LeaseID)
 
+	watchers := make([]*etcdWatcher, 0, len(r.watchers))
 	for _, w := range r.watchers {
-		w.Stop()
+		watchers = append(watchers, w)
+	}
+	r.watchers = make(map[int]*etcdWatcher)
+
+	client := r.client
+	r.mu.Unlock()
+
+	// 使用带超时的 context 撤销租约
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	for key, leaseID := range registered {
+		if _, err := client.Revoke(ctx, leaseID); err != nil {
+			logger.Warning("Failed to revoke lease for %s: %v", key, err)
+		} else {
+			logger.Debug("Revoked lease for %s", key)
+		}
 	}
 
-	if r.client != nil {
-		return r.client.Close()
+	// 停止 watchers（不再需要获取锁）
+	for _, w := range watchers {
+		w.close()
+	}
+
+	if client != nil {
+		return client.Close()
 	}
 
 	return nil
@@ -440,10 +462,14 @@ func (w *etcdWatcher) Next() (*Event, error) {
 
 func (w *etcdWatcher) Stop() {
 	w.r.mu.Lock()
-	defer w.r.mu.Unlock()
-
 	delete(w.r.watchers, w.id)
+	w.r.mu.Unlock()
 
+	w.close()
+}
+
+// close 关闭 watcher（不获取锁，供内部使用）
+func (w *etcdWatcher) close() {
 	select {
 	case <-w.done:
 	default:

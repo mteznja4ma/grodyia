@@ -138,23 +138,34 @@ func (r *consulRegistry) Connect() error {
 
 func (r *consulRegistry) Close() error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if !r.running {
+		r.mu.Unlock()
 		return nil
 	}
 
 	r.running = false
 	close(r.stopCh)
 
-	// Deregister all services
-	for _, s := range r.registered {
+	// 复制数据，避免持有锁时执行阻塞操作
+	registered := make([]*Service, len(r.registered))
+	copy(registered, r.registered)
+	r.registered = nil
+
+	watchers := make([]*consulWatcher, 0, len(r.watchers))
+	for _, w := range r.watchers {
+		watchers = append(watchers, w)
+	}
+	r.watchers = make(map[int]*consulWatcher)
+	r.mu.Unlock()
+
+	// 注销服务
+	for _, s := range registered {
 		r.deregisterService(s)
 	}
 
-	// Stop all watchers
-	for _, w := range r.watchers {
-		w.Stop()
+	// 停止 watchers
+	for _, w := range watchers {
+		w.close()
 	}
 
 	return nil
@@ -474,10 +485,14 @@ func (w *consulWatcher) Next() (*Event, error) {
 
 func (w *consulWatcher) Stop() {
 	w.r.mu.Lock()
-	defer w.r.mu.Unlock()
-
 	delete(w.r.watchers, w.id)
+	w.r.mu.Unlock()
 
+	w.close()
+}
+
+// close 关闭 watcher（不获取锁，供内部使用）
+func (w *consulWatcher) close() {
 	select {
 	case <-w.done:
 	default:

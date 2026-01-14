@@ -61,15 +61,24 @@ func (r *memoryRegistry) Connect() error {
 
 func (r *memoryRegistry) Close() error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
+	if !r.running {
+		r.mu.Unlock()
+		return nil
+	}
 	r.running = false
 
+	watchers := make([]*memoryWatcher, 0, len(r.watchers))
 	for _, w := range r.watchers {
-		close(w.done)
+		watchers = append(watchers, w)
 	}
 	r.watchers = make(map[int]*memoryWatcher)
 	r.services = make(map[string][]*Service)
+	r.mu.Unlock()
+
+	// 停止 watchers
+	for _, w := range watchers {
+		w.close()
+	}
 
 	return nil
 }
@@ -243,10 +252,14 @@ func (w *memoryWatcher) Next() (*Event, error) {
 
 func (w *memoryWatcher) Stop() {
 	w.r.mu.Lock()
-	defer w.r.mu.Unlock()
-
 	delete(w.r.watchers, w.id)
+	w.r.mu.Unlock()
 
+	w.close()
+}
+
+// close 关闭 watcher（不获取锁，供内部使用）
+func (w *memoryWatcher) close() {
 	select {
 	case <-w.done:
 	default:

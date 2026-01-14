@@ -110,27 +110,40 @@ func (r *nacosRegistry) Connect() error {
 
 func (r *nacosRegistry) Close() error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	if !r.running {
+		r.mu.Unlock()
 		return nil
 	}
 
 	r.running = false
 
-	// Deregister all services
-	for _, s := range r.registered {
+	// 复制数据，避免持有锁时执行阻塞操作
+	registered := make([]*Service, len(r.registered))
+	copy(registered, r.registered)
+	r.registered = nil
+
+	watchers := make([]*nacosWatcher, 0, len(r.watchers))
+	for _, w := range r.watchers {
+		watchers = append(watchers, w)
+	}
+	r.watchers = make(map[int]*nacosWatcher)
+
+	client := r.client
+	r.mu.Unlock()
+
+	// 注销服务
+	for _, s := range registered {
 		r.deregisterInstance(s)
 	}
 
-	// Stop all watchers
-	for _, w := range r.watchers {
-		w.Stop()
+	// 停止 watchers
+	for _, w := range watchers {
+		w.close()
 	}
 
 	// Shutdown client
-	if r.client != nil {
-		r.client.CloseClient()
+	if client != nil {
+		client.CloseClient()
 	}
 
 	return nil
@@ -385,17 +398,24 @@ func (w *nacosWatcher) Next() (*Event, error) {
 
 func (w *nacosWatcher) Stop() {
 	w.r.mu.Lock()
-	defer w.r.mu.Unlock()
+	delete(w.r.watchers, w.id)
+	client := w.r.client
+	opts := w.r.opts
+	w.r.mu.Unlock()
 
 	// Unsubscribe if subscribed
-	if w.subscribed && w.r.client != nil && w.service != "" {
-		w.r.client.Unsubscribe(&vo.SubscribeParam{
+	if w.subscribed && client != nil && w.service != "" {
+		client.Unsubscribe(&vo.SubscribeParam{
 			ServiceName: w.service,
-			GroupName:   w.r.opts.Group,
+			GroupName:   opts.Group,
 		})
 	}
 
-	delete(w.r.watchers, w.id)
+	w.close()
+}
+
+// close 关闭 watcher（不获取锁，供内部使用）
+func (w *nacosWatcher) close() {
 
 	select {
 	case <-w.done:
