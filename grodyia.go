@@ -339,14 +339,19 @@ func (a *App) Stop() error {
 
 	var lastErr error
 
-	// 从注册中心注销
+	// 从注册中心注销 (使用与注册时相同的 ID)
 	if a.registry != nil {
 		for _, t := range a.transports {
 			svc := &registry.Service{
-				Name: t.Name(),
-				ID:   a.opts.ID,
+				ID:      t.ID(),
+				Name:    t.Name(),
+				Address: t.Addr(),
 			}
-			a.registry.Deregister(svc)
+			if err := a.registry.Deregister(svc); err != nil {
+				logger.Warning("Registry deregister failed for %s: %v", t.Name(), err)
+			} else {
+				logger.Info("Deregistered service: %s/%s", t.Name(), t.ID())
+			}
 		}
 		a.registry.Close()
 	}

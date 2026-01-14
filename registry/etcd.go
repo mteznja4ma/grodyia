@@ -28,6 +28,7 @@ type etcdRegistry struct {
 	running    bool
 	stopCh     chan struct{}
 	registered map[string]clientv3.LeaseID // service key -> lease ID
+	prefix     string                      // key prefix: /grodyia/{group}/{namespace}
 }
 
 // NewEtcdRegistry creates a new etcd registry
@@ -38,13 +39,21 @@ func newEtcdRegistry(opts ...Option) Registry {
 		o(&options)
 	}
 
+	prefix := etcdPrefix + "/" + options.Group + "/" + options.Namespace
+
 	return &etcdRegistry{
 		opts:       options,
 		services:   make(map[string][]*Service),
 		watchers:   make(map[int]*etcdWatcher),
 		stopCh:     make(chan struct{}),
 		registered: make(map[string]clientv3.LeaseID),
+		prefix:     prefix,
 	}
+}
+
+// serviceKey returns the full key for a service
+func (r *etcdRegistry) serviceKey(name, id string) string {
+	return r.prefix + "/" + name + "/" + id
 }
 
 func (r *etcdRegistry) Type() Type {
@@ -141,7 +150,7 @@ func (r *etcdRegistry) Register(s *Service) error {
 	s.Healthy = true
 
 	// Register service with lease
-	key := etcdPrefix + "/" + r.opts.Group + "/" + r.opts.Namespace + "/" + s.Name + "/" + s.ID
+	key := r.serviceKey(s.Name, s.ID)
 	value, _ := json.Marshal(s)
 
 	_, err = r.client.Put(ctx, key, string(value), clientv3.WithLease(lease.ID))
@@ -177,7 +186,7 @@ func (r *etcdRegistry) Register(s *Service) error {
 	}()
 
 	// Update local cache
-	services := r.services[s.ID]
+	services := r.services[s.Name]
 	found := false
 	for i, svc := range services {
 		if svc.ID == s.ID {
@@ -187,7 +196,7 @@ func (r *etcdRegistry) Register(s *Service) error {
 		}
 	}
 	if !found {
-		r.services[s.ID] = append(services, s)
+		r.services[s.Name] = append(services, s)
 	}
 
 	r.notify(&Event{Type: Create, Service: s, Timestamp: time.Now()})
@@ -203,7 +212,7 @@ func (r *etcdRegistry) Deregister(s *Service) error {
 		return ErrNotConnected
 	}
 
-	key := etcdPrefix + "/" + r.opts.Group + "/" + r.opts.Namespace + "/" + s.Name + "/" + s.ID
+	key := r.serviceKey(s.Name, s.ID)
 
 	// Revoke lease if exists
 	if leaseID, ok := r.registered[key]; ok {
@@ -242,7 +251,7 @@ func (r *etcdRegistry) GetService(name string) ([]*Service, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.opts.Timeout)
 	defer cancel()
 
-	prefix := etcdPrefix + "/" + r.opts.Group
+	prefix := r.prefix + "/" + name
 	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("etcd get service failed: %w", err)
@@ -280,7 +289,7 @@ func (r *etcdRegistry) ListServices() ([]*Service, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.opts.Timeout)
 	defer cancel()
 
-	resp, err := r.client.Get(ctx, etcdPrefix, clientv3.WithPrefix())
+	resp, err := r.client.Get(ctx, r.prefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("etcd list services failed: %w", err)
 	}
@@ -343,7 +352,7 @@ type etcdWatcher struct {
 }
 
 func (w *etcdWatcher) watch() {
-	prefix := etcdPrefix + "/" + w.r.opts.Group
+	prefix := w.r.prefix
 
 	tctx, tcancel := context.WithTimeout(context.Background(), w.r.opts.Timeout)
 	defer tcancel()
@@ -358,7 +367,9 @@ func (w *etcdWatcher) watch() {
 		if err := json.Unmarshal(kv.Value, &s); err != nil {
 			continue
 		}
+		w.r.mu.Lock()
 		w.r.services[s.Name] = append(w.r.services[s.Name], &s)
+		w.r.mu.Unlock()
 
 		event := &Event{Type: Create, Service: &s, Timestamp: time.Now()}
 
@@ -380,9 +391,10 @@ func (w *etcdWatcher) watch() {
 			for _, ev := range resp.Events {
 				var s Service
 				if err := json.Unmarshal(ev.Kv.Value, &s); err != nil {
-					// Try to parse service name from key
+					// Try to parse service name from key: prefix/Name/ID
 					key := string(ev.Kv.Key)
-					parts := strings.Split(strings.TrimPrefix(key, prefix), "/")
+					suffix := strings.TrimPrefix(key, prefix+"/")
+					parts := strings.Split(suffix, "/")
 					if len(parts) >= 2 {
 						s.Name = parts[0]
 						s.ID = parts[1]

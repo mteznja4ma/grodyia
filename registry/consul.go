@@ -21,6 +21,7 @@ type consulRegistry struct {
 	running    bool
 	stopCh     chan struct{}
 	registered []*Service
+	prefix     string // service name prefix: {group}/{namespace}
 }
 
 // NewConsulRegistry creates a new Consul registry
@@ -31,13 +32,42 @@ func newConsulRegistry(opts ...Option) Registry {
 		o(&options)
 	}
 
+	// Build prefix for service names
+	prefix := ""
+	if options.Group != "" {
+		prefix = options.Group
+	}
+	if options.Namespace != "" {
+		if prefix != "" {
+			prefix += "/"
+		}
+		prefix += options.Namespace
+	}
+
 	return &consulRegistry{
 		opts:       options,
 		services:   make(map[string][]*Service),
 		watchers:   make(map[int]*consulWatcher),
 		stopCh:     make(chan struct{}),
 		registered: make([]*Service, 0),
+		prefix:     prefix,
 	}
+}
+
+// serviceName returns the full service name with prefix
+func (r *consulRegistry) serviceName(name string) string {
+	if r.prefix == "" {
+		return name
+	}
+	return r.prefix + "/" + name
+}
+
+// serviceID returns the full service ID with prefix
+func (r *consulRegistry) serviceID(id string) string {
+	if r.prefix == "" {
+		return id
+	}
+	return r.prefix + "/" + id
 }
 
 func (r *consulRegistry) Type() Type {
@@ -139,10 +169,13 @@ func (r *consulRegistry) Register(s *Service) error {
 	}
 
 	address, port := parseAddr(s.Address, 80)
-	// Build service registration
+	// Build service registration with prefix
+	serviceID := r.serviceID(s.ID)
+	serviceName := r.serviceName(s.Name)
+
 	registration := &api.AgentServiceRegistration{
-		ID:      s.ID,
-		Name:    s.Name,
+		ID:      serviceID,
+		Name:    serviceName,
 		Address: address,
 		Port:    port,
 		Tags:    []string{s.Version},
@@ -158,9 +191,9 @@ func (r *consulRegistry) Register(s *Service) error {
 	}
 
 	// Pass initial health check
-	checkID := fmt.Sprintf("service:%s", s.ID)
+	checkID := fmt.Sprintf("service:%s", serviceID)
 	if err := r.client.Agent().PassTTL(checkID, "initial registration"); err != nil {
-		logger.Warning("Failed to pass initial TTL for %s: %v", s.ID, err)
+		logger.Warning("Failed to pass initial TTL for %s: %v", serviceID, err)
 	}
 
 	s.LastSeen = time.Now()
@@ -190,7 +223,7 @@ func (r *consulRegistry) deregisterService(s *Service) error {
 	if r.client == nil {
 		return nil
 	}
-	return r.client.Agent().ServiceDeregister(s.ID)
+	return r.client.Agent().ServiceDeregister(r.serviceID(s.ID))
 }
 
 func (r *consulRegistry) Deregister(s *Service) error {
@@ -231,7 +264,7 @@ func (r *consulRegistry) GetService(name string) ([]*Service, error) {
 	}
 	r.mu.RUnlock()
 
-	entries, _, err := r.client.Health().Service(name, "", true, nil)
+	entries, _, err := r.client.Health().Service(r.serviceName(name), "", true, nil)
 	if err != nil {
 		// Fallback to cache
 		r.mu.RLock()
@@ -360,9 +393,10 @@ func (r *consulRegistry) healthCheckLoop() {
 			r.mu.RUnlock()
 
 			for _, s := range services {
-				checkID := fmt.Sprintf("service:%s", s.ID)
+				serviceID := r.serviceID(s.ID)
+				checkID := fmt.Sprintf("service:%s", serviceID)
 				if err := r.client.Agent().PassTTL(checkID, "health check"); err != nil {
-					logger.Warning("Health check failed for %s: %v", s.ID, err)
+					logger.Warning("Health check failed for %s: %v", serviceID, err)
 				}
 			}
 		}
@@ -386,7 +420,7 @@ func (w *consulWatcher) watch() {
 		default:
 		}
 
-		entries, meta, err := w.r.client.Health().Service(w.service, "", true, &api.QueryOptions{
+		entries, meta, err := w.r.client.Health().Service(w.r.serviceName(w.service), "", true, &api.QueryOptions{
 			WaitIndex: w.lastIndex,
 			WaitTime:  time.Second * 30,
 		})
