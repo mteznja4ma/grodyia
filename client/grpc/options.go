@@ -27,6 +27,10 @@ type Options struct {
 	MaxRetries int
 	RetryDelay time.Duration
 
+	// Auto-reconnect configuration
+	AutoReconnect     bool
+	ReconnectInterval time.Duration
+
 	// gRPC dial options
 	DialOptions []grpc.DialOption
 
@@ -36,6 +40,11 @@ type Options struct {
 
 	// Insecure connection (no TLS)
 	Insecure bool
+
+	// TLS configuration
+	TLSCert   string // Path to client certificate
+	TLSKey    string // Path to client key
+	TLSCACert string // Path to CA certificate
 }
 
 // Option is a function that modifies Options
@@ -44,14 +53,16 @@ type Option func(*Options)
 // DefaultOptions returns sensible defaults
 func DefaultOptions() Options {
 	return Options{
-		Address:     "localhost:9000",
-		Codec:       codec.NewJSONCodec(),
-		DialTimeout: time.Second * 5,
-		CallTimeout: time.Second * 30,
-		PoolSize:    1,
-		MaxRetries:  3,
-		RetryDelay:  time.Millisecond * 100,
-		Insecure:    true,
+		Address:           "localhost:9000",
+		Codec:             codec.NewJSONCodec(),
+		DialTimeout:       time.Second * 5,
+		CallTimeout:       time.Second * 30,
+		PoolSize:          1,
+		MaxRetries:        3,
+		RetryDelay:        time.Millisecond * 100,
+		AutoReconnect:     true,
+		ReconnectInterval: time.Second * 5,
+		Insecure:          true,
 	}
 }
 
@@ -122,5 +133,29 @@ func WithStreamInterceptor(i grpc.StreamClientInterceptor) Option {
 func WithInsecure(insecure bool) Option {
 	return func(o *Options) {
 		o.Insecure = insecure
+	}
+}
+
+// WithTLS sets TLS configuration
+func WithTLS(cert, key, caCert string) Option {
+	return func(o *Options) {
+		o.TLSCert = cert
+		o.TLSKey = key
+		o.TLSCACert = caCert
+		o.Insecure = false
+	}
+}
+
+// WithAutoReconnect enables/disables auto-reconnect
+func WithAutoReconnect(enabled bool) Option {
+	return func(o *Options) {
+		o.AutoReconnect = enabled
+	}
+}
+
+// WithReconnectInterval sets the reconnect check interval
+func WithReconnectInterval(d time.Duration) Option {
+	return func(o *Options) {
+		o.ReconnectInterval = d
 	}
 }

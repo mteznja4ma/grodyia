@@ -22,6 +22,9 @@ type Options struct {
 
 	// 编解码器
 	Codec codec.Codec
+
+	// 日志路径 (为空则不保存到文件)
+	LogPath string
 }
 
 // Option 配置函数
@@ -79,5 +82,12 @@ func WithRegistry(r registry.Registry) Option {
 func WithCodec(c codec.Codec) Option {
 	return func(o *Options) {
 		o.Codec = c
+	}
+}
+
+// WithLogPath 设置日志保存路径
+func WithLogPath(path string) Option {
+	return func(o *Options) {
+		o.LogPath = path
 	}
 }

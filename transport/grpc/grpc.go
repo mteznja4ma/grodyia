@@ -2,11 +2,15 @@ package grpc
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/mteznja4ma/grodyia/health"
@@ -83,6 +87,17 @@ func (s *Server) Start(ctx context.Context) error {
 	streamInterceptorOption := grpc.ChainStreamInterceptor(s.buildStreamInterceptors()...)
 
 	serverOpts := append(s.options.GrpcOptions, unaryInterceptorOption, streamInterceptorOption)
+
+	// 添加 TLS 配置
+	if s.options.TLSCert != "" && s.options.TLSKey != "" {
+		creds, err := s.loadTLSCredentials()
+		if err != nil {
+			return fmt.Errorf("failed to load TLS credentials: %w", err)
+		}
+		serverOpts = append(serverOpts, grpc.Creds(creds))
+		logger.Info("TLS enabled for gRPC server")
+	}
+
 	s.server = grpc.NewServer(serverOpts...)
 
 	// 注册用户服务
@@ -101,13 +116,50 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// 非阻塞启动
 	go func() {
-		logger.Info("gRPC server starting on %s", s.options.Address)
+		if s.options.TLSCert != "" {
+			logger.Info("gRPC server starting on %s (TLS)", s.options.Address)
+		} else {
+			logger.Info("gRPC server starting on %s", s.options.Address)
+		}
 		if err := s.server.Serve(ln); err != nil {
 			logger.Error("Server error: %v", err)
 		}
 	}()
 
 	return nil
+}
+
+// loadTLSCredentials loads TLS credentials for the server
+func (s *Server) loadTLSCredentials() (credentials.TransportCredentials, error) {
+	// Load server certificate and key
+	serverCert, err := tls.LoadX509KeyPair(s.options.TLSCert, s.options.TLSKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load server cert: %w", err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientAuth:   tls.NoClientCert,
+	}
+
+	// Load CA certificate for mutual TLS
+	if s.options.TLSMutual && s.options.TLSCACert != "" {
+		caCert, err := os.ReadFile(s.options.TLSCACert)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA cert: %w", err)
+		}
+
+		certPool := x509.NewCertPool()
+		if !certPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to append CA cert")
+		}
+
+		tlsConfig.ClientCAs = certPool
+		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		logger.Info("Mutual TLS enabled")
+	}
+
+	return credentials.NewTLS(tlsConfig), nil
 }
 
 // Stop 停止服务器
@@ -128,8 +180,8 @@ func (s *Server) Stop(ctx context.Context) error {
 	select {
 	case <-done:
 		logger.Info("Server stopped gracefully")
-	case <-time.After(time.Second * 10):
-		logger.Warning("Server force stopping")
+	case <-ctx.Done():
+		logger.Warning("Server force stopping due to context cancellation")
 		s.server.Stop()
 	}
 

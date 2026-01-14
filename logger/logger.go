@@ -66,11 +66,12 @@ func init() {
 			logStr := i.LogStr
 			if i.Level >= WarningLevel {
 				c := colorPrint.FontColor.LightGray
-				if i.Level == WarningLevel {
+				switch i.Level {
+				case WarningLevel:
 					c = colorPrint.FontColor.Yellow
-				} else if i.Level == ErrorLevel {
+				case ErrorLevel:
 					c = colorPrint.FontColor.Red
-				} else if i.Level == FatalLevel {
+				case FatalLevel:
 					c = colorPrint.FontColor.LightRed
 				}
 				colorPrint.ColorPrint(logStr, c)
@@ -107,7 +108,7 @@ func New(directory string) error {
 		LocalTime:  true,
 	})
 
-	Info("", "Logger is successfully initialized!")
+	Info("Logger is successfully initialized!")
 	return nil
 }
 

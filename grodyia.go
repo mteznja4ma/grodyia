@@ -238,6 +238,13 @@ func (a *App) Start() error {
 	a.running = true
 	a.mu.Unlock()
 
+	// 初始化日志
+	logPath := a.opts.LogPath
+	if logPath == "" {
+		logPath = "./logs"
+	}
+	logger.New(logPath)
+
 	logger.Info("Starting %s v%s (Grodyia %s)", a.opts.Name, a.opts.Version, Version)
 
 	// 执行启动前钩子
@@ -280,7 +287,9 @@ func (a *App) Start() error {
 
 	// Watcher
 	if a.registry != nil {
-		a.registry.Watch()
+		if _, err := a.registry.Watch(); err != nil {
+			logger.Warning("Registry watch failed: %v", err)
+		}
 	}
 
 	// 发布启动事件
@@ -321,7 +330,7 @@ func (a *App) Stop() error {
 	// 执行停止前钩子
 	for _, fn := range a.beforeStop {
 		if err := fn(a); err != nil {
-			logger.Warning(a.opts.Name, "Before stop hook error: %v", err)
+			logger.Warning("Before stop hook error: %v", err)
 		}
 	}
 

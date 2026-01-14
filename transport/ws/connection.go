@@ -165,7 +165,7 @@ func (c *Connection) readPump(opts Options) {
 		messageType, data, err := c.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				logger.Warning("ws", "Connection %s read error: %v", c.ID, err)
+				logger.Warning("Connection %s read error: %v", c.ID, err)
 			}
 			return
 		}
@@ -177,7 +177,7 @@ func (c *Connection) readPump(opts Options) {
 				Conn: c,
 			}
 			if err := c.handler(context.Background(), msg); err != nil {
-				logger.Warning("ws", "Handler error for connection %s: %v", c.ID, err)
+				logger.Warning("Handler error for connection %s: %v", c.ID, err)
 			}
 		}
 	}
@@ -201,7 +201,7 @@ func (c *Connection) writePump(opts Options) {
 			}
 
 			if err := c.Conn.WriteMessage(websocket.BinaryMessage, message); err != nil {
-				logger.Warning("ws", "Connection %s write error: %v", c.ID, err)
+				logger.Warning("Connection %s write error: %v", c.ID, err)
 				return
 			}
 

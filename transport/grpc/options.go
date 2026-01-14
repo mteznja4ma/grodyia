@@ -33,6 +33,12 @@ type Options struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 
+	// TLS configuration
+	TLSCert   string // Path to server certificate
+	TLSKey    string // Path to server key
+	TLSCACert string // Path to CA certificate (for mTLS)
+	TLSMutual bool   // Enable mutual TLS
+
 	// gRPC specific options
 	GrpcOptions []grpc.ServerOption
 
@@ -144,5 +150,23 @@ func WithTimeout(read, write time.Duration) Option {
 	return func(o *Options) {
 		o.ReadTimeout = read
 		o.WriteTimeout = write
+	}
+}
+
+// WithTLS sets TLS configuration
+func WithTLS(cert, key string) Option {
+	return func(o *Options) {
+		o.TLSCert = cert
+		o.TLSKey = key
+	}
+}
+
+// WithMutualTLS sets mutual TLS configuration
+func WithMutualTLS(cert, key, caCert string) Option {
+	return func(o *Options) {
+		o.TLSCert = cert
+		o.TLSKey = key
+		o.TLSCACert = caCert
+		o.TLSMutual = true
 	}
 }
