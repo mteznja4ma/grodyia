@@ -129,9 +129,7 @@ func (r *etcdRegistry) Close() error {
 	for key, leaseID := range registered {
 		if _, err := client.Revoke(ctx, leaseID); err != nil {
 			logger.Warning("Failed to revoke lease for %s: %v", key, err)
-		} else {
-			logger.Debug("Revoked lease for %s", key)
-		}
+		} 
 	}
 
 	if client != nil {

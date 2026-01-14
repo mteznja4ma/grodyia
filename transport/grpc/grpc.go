@@ -228,8 +228,6 @@ func (s *Server) loggingInterceptor() grpc.UnaryServerInterceptor {
 
 		if err != nil {
 			logger.Warning("%s | %v | error: %v", info.FullMethod, duration, err)
-		} else {
-			logger.Debug("%s | %v", info.FullMethod, duration)
 		}
 
 		return resp, err

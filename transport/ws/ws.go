@@ -199,8 +199,6 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	s.connections[connID] = c
 	s.mu.Unlock()
 
-	logger.Debug("New connection: %s", connID)
-
 	if s.onConnect != nil {
 		s.onConnect(c)
 	}
@@ -218,7 +216,6 @@ func (s *Server) removeConnection(id string) {
 	s.mu.Lock()
 	delete(s.connections, id)
 	s.mu.Unlock()
-	logger.Debug("Connection removed: %s", id)
 }
 
 // Connections 返回所有连接

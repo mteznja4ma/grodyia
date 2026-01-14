@@ -231,7 +231,6 @@ func (c *client) connectionMonitor() {
 			c.mu.RUnlock()
 
 			if conn == nil {
-				logger.Debug("Connection is nil, attempting reconnect...")
 				if err := c.Reconnect(); err != nil {
 					logger.Warning("Reconnect failed: %v", err)
 				}
@@ -263,7 +262,6 @@ func Call[Req, Resp any](
 	for i := 0; i <= opts.MaxRetries; i++ {
 		if i > 0 {
 			time.Sleep(opts.RetryDelay * time.Duration(i))
-			logger.Debug("Retrying %s (attempt %d)", method, i+1)
 		}
 
 		callCtx, cancel := context.WithTimeout(ctx, opts.CallTimeout)

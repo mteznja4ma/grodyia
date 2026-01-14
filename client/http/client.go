@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 	"time"
-
-	"github.com/mteznja4ma/grodyia/logger"
 )
 
 // Client is an HTTP client wrapper
@@ -112,7 +110,6 @@ func (c *client) Do(ctx context.Context, method, path string, body []byte) ([]by
 	for i := 0; i <= c.opts.MaxRetries; i++ {
 		if i > 0 {
 			time.Sleep(c.opts.RetryDelay * time.Duration(i))
-			logger.Debug("http-client", "Retrying %s %s (attempt %d)", method, path, i+1)
 		}
 
 		data, statusCode, err := c.doRequest(ctx, method, url, body)

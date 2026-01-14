@@ -322,6 +322,9 @@ func (a *App) Stop() error {
 
 	logger.Info("Stopping application...")
 
+	// 取消应用上下文，通知所有监听 ctx.Done() 的组件
+	a.cancel()
+
 	// 执行停止前钩子
 	for _, fn := range a.beforeStop {
 		if err := fn(a); err != nil {
@@ -329,21 +332,15 @@ func (a *App) Stop() error {
 		}
 	}
 
-	// 发布停止事件
-	a.eventBus.Publish(a.ctx, "app.stopping", nil)
-
-	var lastErr error
-
-	// 关闭注册中心 (Close 内部会自动注销所有已注册的服务)
+	// 关闭注册中心
 	if a.registry != nil {
 		if err := a.registry.Close(); err != nil {
 			logger.Warning("Registry close error: %v", err)
-		} else {
-			logger.Info("Registry closed and services deregistered")
 		}
 	}
 
-	// 停止所有传输层 (各 transport 内部处理超时)
+	// 停止所有传输层
+	var lastErr error
 	for _, t := range a.transports {
 		if err := t.Stop(); err != nil {
 			lastErr = err
@@ -352,10 +349,9 @@ func (a *App) Stop() error {
 	}
 
 	// 关闭事件总线
-	a.eventBus.Close()
-
-	// 取消应用上下文
-	a.cancel()
+	if err := a.eventBus.Close(); err != nil {
+		logger.Warning("EventBus close error: %v", err)
+	}
 
 	// 执行停止后钩子
 	for _, fn := range a.afterStop {
