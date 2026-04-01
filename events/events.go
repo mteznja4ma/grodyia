@@ -62,6 +62,16 @@ type eventBus struct {
 	mu          sync.RWMutex
 	closed      bool
 	nextID      int
+	jobs        chan eventJob
+	done        chan struct{}
+	workerWG    sync.WaitGroup
+	startOnce   sync.Once
+}
+
+type eventJob struct {
+	ctx     context.Context
+	handler Handler
+	event   *Event
 }
 
 // NewBus creates a new event bus
@@ -71,18 +81,37 @@ func NewBus(opts ...Option) Bus {
 		o(&options)
 	}
 
-	return &eventBus{
+	if options.BufferSize <= 0 {
+		options.BufferSize = 1
+	}
+	if options.WorkerCount <= 0 {
+		options.WorkerCount = 1
+	}
+
+	b := &eventBus{
 		opts:        options,
 		subscribers: make(map[string][]*subscription),
+		done:        make(chan struct{}),
 	}
+	if options.Async {
+		b.jobs = make(chan eventJob, options.BufferSize)
+	}
+	return b
 }
 
 func (b *eventBus) Publish(ctx context.Context, topic string, data any) error {
 	b.mu.RLock()
-	defer b.mu.RUnlock()
-
 	if b.closed {
+		b.mu.RUnlock()
 		return ErrBusClosed
+	}
+	subs := append([]*subscription(nil), b.subscribers[topic]...)
+	wildcardSubs := append([]*subscription(nil), b.subscribers["*"]...)
+	async := b.opts.Async
+	b.mu.RUnlock()
+
+	if len(subs) == 0 && len(wildcardSubs) == 0 {
+		return nil
 	}
 
 	event := &Event{
@@ -92,16 +121,11 @@ func (b *eventBus) Publish(ctx context.Context, topic string, data any) error {
 		Metadata:  make(map[string]string),
 	}
 
-	subs, ok := b.subscribers[topic]
-	if !ok {
-		return nil
-	}
-
 	for _, sub := range subs {
-		if b.opts.Async {
-			go func(h Handler) {
-				h(ctx, event)
-			}(sub.handler)
+		if async {
+			if err := b.enqueue(ctx, sub.handler, event); err != nil {
+				return err
+			}
 		} else {
 			if err := sub.handler(ctx, event); err != nil {
 				return err
@@ -110,16 +134,14 @@ func (b *eventBus) Publish(ctx context.Context, topic string, data any) error {
 	}
 
 	// Also publish to wildcard subscribers
-	if wildcardSubs, ok := b.subscribers["*"]; ok {
-		for _, sub := range wildcardSubs {
-			if b.opts.Async {
-				go func(h Handler) {
-					h(ctx, event)
-				}(sub.handler)
-			} else {
-				if err := sub.handler(ctx, event); err != nil {
-					return err
-				}
+	for _, sub := range wildcardSubs {
+		if async {
+			if err := b.enqueue(ctx, sub.handler, event); err != nil {
+				return err
+			}
+		} else {
+			if err := sub.handler(ctx, event); err != nil {
+				return err
 			}
 		}
 	}
@@ -168,11 +190,58 @@ func (b *eventBus) unsubscribe(sub *subscription) error {
 
 func (b *eventBus) Close() error {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
+	if b.closed {
+		b.mu.Unlock()
+		return nil
+	}
 	b.closed = true
 	b.subscribers = make(map[string][]*subscription)
+	b.mu.Unlock()
+
+	if b.opts.Async {
+		close(b.done)
+		b.workerWG.Wait()
+	}
 	return nil
+}
+
+func (b *eventBus) enqueue(ctx context.Context, handler Handler, event *Event) error {
+	b.startWorkers()
+
+	job := eventJob{
+		ctx:     ctx,
+		handler: handler,
+		event:   event,
+	}
+
+	select {
+	case <-b.done:
+		return ErrBusClosed
+	case b.jobs <- job:
+		return nil
+	}
+}
+
+func (b *eventBus) startWorkers() {
+	b.startOnce.Do(func() {
+		for i := 0; i < b.opts.WorkerCount; i++ {
+			b.workerWG.Add(1)
+			go b.worker()
+		}
+	})
+}
+
+func (b *eventBus) worker() {
+	defer b.workerWG.Done()
+
+	for {
+		select {
+		case <-b.done:
+			return
+		case job := <-b.jobs:
+			job.handler(job.ctx, job.event)
+		}
+	}
 }
 
 // NewEvent creates a new event

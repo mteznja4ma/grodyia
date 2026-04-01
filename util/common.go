@@ -12,24 +12,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// CurrentMalloc
-/*
- * 内存状态
- * @return int64
- */
+// CurrentMalloc returns the current allocated memory size in KB.
 func CurrentMalloc() int64 {
 	var rtm runtime.MemStats
 	runtime.ReadMemStats(&rtm)
 	return int64(rtm.Alloc / 1024)
 }
 
-// ParseArgumentsUint32
-/*
- * 获取键入字符串数组中 key 对应 value
- * @param [name] string - Key
- * @param [args] []string - Maps
- * @return (uint32, bool)
- */
+// ParseArgumentsUint32 returns the uint32 value for a key from key=value args.
 func ParseArgumentsUint32(name string, args []string) (uint32, bool) {
 	for _, arg := range args {
 		a := strings.Split(arg, "=")
@@ -46,13 +36,7 @@ func ParseArgumentsUint32(name string, args []string) (uint32, bool) {
 	return 0, false
 }
 
-// ParseArgumentsString
-/*
- * 获取键入字符串数组中 key 对应 value
- * @param [name] string - Key
- * @param [args] []string - Maps
- * @return (string, bool)
- */
+// ParseArgumentsString returns the string value for a key from key=value args.
 func ParseArgumentsString(name string, args []string) (string, bool) {
 	for _, arg := range args {
 		a := strings.Split(arg, "=")
@@ -66,12 +50,7 @@ func ParseArgumentsString(name string, args []string) (string, bool) {
 	return "", false
 }
 
-// GetIPFromIPAddress
-/*
- * 获取IP字符串中Port
- * @param [address] string
- * @return (string)
- */
+// GetIPFromIPAddress returns the IP part from an address string.
 func GetIPFromIPAddress(address string) string {
 	a := strings.Split(address, ":")
 	if len(a) != 2 {
@@ -80,12 +59,7 @@ func GetIPFromIPAddress(address string) string {
 	return a[0]
 }
 
-// GetPortFromIPAddress
-/*
- * 获取IP字符串中Port
- * @param [address] string
- * @return (int)
- */
+// GetPortFromIPAddress returns the port part from an address string.
 func GetPortFromIPAddress(address string) int {
 	a := strings.Split(address, ":")
 	if len(a) != 2 {
@@ -95,38 +69,24 @@ func GetPortFromIPAddress(address string) int {
 	return p
 }
 
-// RandByte
-/*
- * 获取对应长度的随机字节组
- * @param [length] int
- * @return ([]byte)
- */
+// RandByte returns a random byte slice with the given length.
 func RandByte(length int) []byte {
 	var chars = []byte{'.', '/', '?', '%', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'}
 	buffer := bytes.Buffer{}
 	clength := len(chars)
-	// 使用 crypto/rand 或者直接用全局随机数生成器 (Go 1.20+ 自动初始化)
-	for i := 0; i < length; i++ {
+	// Use the global random generator, which is auto-seeded in Go 1.20+.
+	for range length {
 		buffer.WriteByte(chars[rand.IntN(clength)])
 	}
 	return buffer.Bytes()
 }
 
-// GetUUID
-/*
- * 获取 UUID
- * return (string)
- */
+// GetUUID returns a new UUID string.
 func GetUUID() string {
 	return uuid.New().String()
 }
 
-// CheckPortUsage
-/*
- * 端口占用检测
- * @param [port] int
- * @return (bool)
- */
+// CheckPortUsage reports whether the given local port is in use.
 func CheckPortUsage(port int) bool {
 	p := strconv.Itoa(port)
 	address := net.JoinHostPort("127.0.0.1", p)

@@ -3,34 +3,48 @@ package ws
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"net/http"
+	"runtime"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 
 	"github.com/mteznja4ma/grodyia/health"
 	"github.com/mteznja4ma/grodyia/logger"
 )
 
-// Server 是 WebSocket 服务器，实现 grodyia.Transport 接口
+const parallelBroadcastThreshold = 256
+const connectionShardCount = 32
+
+type connectionShard struct {
+	mu          sync.RWMutex
+	connections map[string]*Connection
+}
+
+// Server implements the Grodyia transport interface for WebSocket.
 type Server struct {
 	opts           Options
 	server         *http.Server
 	upgrader       websocket.Upgrader
-	connections    map[string]*Connection
-	mu             sync.RWMutex
+	connectionSets []connectionShard
+	activeCount    atomic.Int64
 	healthStatus   health.Health
 	onConnect      func(*Connection)
 	onDisconnect   func(*Connection)
 	messageHandler MessageHandler
 
-	addr     string
-	stopping bool // 是否正在停止
+	addr          string
+	nextConnID    atomic.Uint64
+	stopping      atomic.Bool // Indicates whether shutdown is in progress.
+	heartbeatStop chan struct{}
+	heartbeatDone chan struct{}
 }
 
-// NewServer 创建新的 WebSocket 服务器
+// NewServer creates a new WebSocket server.
 func NewServer(opts ...Option) *Server {
 	options := DefaultOptions()
 	for _, o := range opts {
@@ -43,8 +57,8 @@ func NewServer(opts ...Option) *Server {
 	}
 
 	return &Server{
-		opts:        options,
-		connections: make(map[string]*Connection),
+		opts:           options,
+		connectionSets: newConnectionShards(),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:    options.ReadBufferSize,
 			WriteBufferSize:   options.WriteBufferSize,
@@ -54,37 +68,39 @@ func NewServer(opts ...Option) *Server {
 				return checkOrigin(r.Header.Get("Origin"))
 			},
 		},
-		healthStatus: health.NewHealthState(fmt.Sprintf("ws-%s", options.Address)),
-		addr:         options.Address,
+		healthStatus:  health.NewHealthState(fmt.Sprintf("ws-%s", options.Address)),
+		addr:          options.Address,
+		heartbeatStop: make(chan struct{}),
+		heartbeatDone: make(chan struct{}),
 	}
 }
 
-// ID 返回传输层ID
+// ID returns the transport ID.
 func (s *Server) ID() string {
 	return s.opts.ID
 }
 
-// Metadata 返回传输层元数据
+// Metadata returns transport metadata.
 func (s *Server) Metadata() map[string]string {
 	return s.opts.Metadata
 }
 
-// Version 返回传输层版本
+// Version returns the transport version.
 func (s *Server) Version() string {
 	return s.opts.Version
 }
 
-// Name 返回传输层名称
+// Name returns the transport name.
 func (s *Server) Name() string {
 	return s.opts.Name
 }
 
-// Addr 返回监听地址
+// Addr returns the listen address.
 func (s *Server) Addr() string {
 	return s.addr
 }
 
-// Start 启动服务器 (非阻塞)
+// Start starts the server without blocking.
 func (s *Server) Start() error {
 	mux := http.NewServeMux()
 
@@ -112,186 +128,388 @@ func (s *Server) Start() error {
 	s.healthStatus.SetReady()
 	health.AddHealthState(s.healthStatus)
 
-	// 非阻塞启动
+	// Start serving in the background.
 	go func() {
 		var err error
-		logger.Info("WebSocket server starting on %s%s", s.opts.Address, s.opts.Path)
+		logger.Info("websocket server starting on %s%s", s.opts.Address, s.opts.Path)
 		err = s.server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			logger.Error("Server error: %v", err)
+			logger.Error("server error: %v", err)
 		}
 	}()
+	go s.runHeartbeatScheduler()
 
 	return nil
 }
 
-// Stop 停止服务器
+// Stop stops the server.
 func (s *Server) Stop() error {
 	if s.server == nil {
 		return nil
 	}
 
-	logger.Info("WebSocket server stopping...")
+	logger.Info("websocket server stopping...")
 	s.healthStatus.SetNoReady()
 
-	// 设置停止标志，拒绝新连接
-	s.mu.Lock()
-	s.stopping = true
-	conns := make([]*Connection, 0, len(s.connections))
-	for _, conn := range s.connections {
-		conns = append(conns, conn)
-	}
-	s.connections = make(map[string]*Connection)
-	s.mu.Unlock()
+	// Set the stopping flag and reject new connections.
+	s.stopping.Store(true)
+	conns := s.snapshotConnections()
 
-	// 关闭所有连接
+	// Close all active connections.
 	for _, conn := range conns {
 		conn.Close()
 	}
+	close(s.heartbeatStop)
+	<-s.heartbeatDone
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
 	if err := s.server.Shutdown(ctx); err != nil {
-		logger.Warning("WebSocket server shutdown timeout, forcing close: %v", err)
+		logger.Warning("websocket server shutdown timeout, forcing close: %v", err)
 		return s.server.Close()
 	}
-	logger.Info("WebSocket server stopped gracefully")
+	logger.Info("websocket server stopped gracefully")
 
 	return nil
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	// 检查服务器是否正在停止
-	s.mu.RLock()
-	stopping := s.stopping
-	s.mu.RUnlock()
-
-	if stopping {
+	// Check whether the server is shutting down.
+	if s.stopping.Load() {
 		http.Error(w, "Server is shutting down", http.StatusServiceUnavailable)
+		return
+	}
+	if !s.tryAcquireConnectionSlot() {
+		http.Error(w, "Too many connections", http.StatusServiceUnavailable)
 		return
 	}
 
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logger.Warning("Upgrade failed: %v", err)
+		s.releaseConnectionSlot()
+		logger.Warning("upgrade failed: %v", err)
 		return
 	}
 
-	connID := uuid.New().String()
+	connID := s.nextConnectionID()
 	c := newConnection(connID, conn, s.opts.Codec, s)
 	c.handler = s.messageHandler
 
-	// 将请求头携带到 Metadata 方便业务扩展
-	for key, values := range r.Header {
-		if len(values) > 0 {
-			c.Metadata[key] = values[0]
-		}
-	}
-	// 添加常用的请求信息
-	c.Metadata["RemoteAddr"] = r.RemoteAddr
-	c.Metadata["RequestURI"] = r.RequestURI
+	// Add common request metadata without forcing map allocation.
+	c.remoteAddr = r.RemoteAddr
+	c.requestURI = r.RequestURI
 	if r.URL != nil {
-		c.Metadata["RawQuery"] = r.URL.RawQuery
+		c.rawQuery = r.URL.RawQuery
 	}
 
-	s.mu.Lock()
-	s.connections[connID] = c
-	s.mu.Unlock()
+	s.storeConnection(c)
 
 	if s.onConnect != nil {
 		s.onConnect(c)
 	}
 
-	go c.writePump(s.opts)
-	go func() {
-		c.readPump(s.opts)
-		if s.onDisconnect != nil {
-			s.onDisconnect(c)
-		}
-	}()
+	go c.readPump(s.opts)
 }
 
 func (s *Server) removeConnection(id string) {
-	s.mu.Lock()
-	delete(s.connections, id)
-	s.mu.Unlock()
+	shard := s.connectionShard(id)
+	shard.mu.Lock()
+	if _, ok := shard.connections[id]; ok {
+		delete(shard.connections, id)
+		s.activeCount.Add(-1)
+	}
+	shard.mu.Unlock()
 }
 
-// Connections 返回所有连接
+// Connections returns all active connections.
 func (s *Server) Connections() map[string]*Connection {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	result := make(map[string]*Connection)
-	for k, v := range s.connections {
-		result[k] = v
+	conns := s.snapshotConnections()
+	result := make(map[string]*Connection, len(conns))
+	for _, conn := range conns {
+		result[conn.ID] = conn
 	}
 	return result
 }
 
-// GetConnection 获取连接
+// GetConnection returns a connection by ID.
 func (s *Server) GetConnection(id string) (*Connection, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	conn, ok := s.connections[id]
+	shard := s.connectionShard(id)
+	shard.mu.RLock()
+	defer shard.mu.RUnlock()
+	conn, ok := shard.connections[id]
 	return conn, ok
 }
 
-// Broadcast 广播消息
+// Broadcast sends a message to all connections.
 func (s *Server) Broadcast(data any) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	var lastErr error
-	for _, conn := range s.connections {
-		if err := conn.Send(data); err != nil {
-			lastErr = err
-		}
+	payload, prepared, err := s.prepareBroadcastMessage(data)
+	if err != nil {
+		return err
 	}
-	return lastErr
+
+	conns := s.snapshotConnections()
+	if len(conns) < parallelBroadcastThreshold {
+		var lastErr error
+		for _, conn := range conns {
+			if err := sendBroadcastMessage(conn, payload, prepared, s.opts); err != nil {
+				lastErr = err
+			}
+		}
+		return lastErr
+	}
+
+	return s.broadcastParallel(conns, payload, prepared)
 }
 
-// BroadcastExcept 广播消息 (排除指定连接)
+// BroadcastExcept sends a message to all connections except the given IDs.
 func (s *Server) BroadcastExcept(data any, excludeIDs ...string) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	excludeMap := make(map[string]bool)
 	for _, id := range excludeIDs {
 		excludeMap[id] = true
 	}
 
-	var lastErr error
-	for id, conn := range s.connections {
-		if excludeMap[id] {
+	payload, prepared, err := s.prepareBroadcastMessage(data)
+	if err != nil {
+		return err
+	}
+
+	conns := s.snapshotConnections()
+	if len(conns) < parallelBroadcastThreshold {
+		var lastErr error
+		for _, conn := range conns {
+			if excludeMap[conn.ID] {
+				continue
+			}
+			if err := sendBroadcastMessage(conn, payload, prepared, s.opts); err != nil {
+				lastErr = err
+			}
+		}
+		return lastErr
+	}
+
+	filtered := make([]*Connection, 0, len(conns))
+	for _, conn := range conns {
+		if excludeMap[conn.ID] {
 			continue
 		}
-		if err := conn.Send(data); err != nil {
+		filtered = append(filtered, conn)
+	}
+
+	return s.broadcastParallel(filtered, payload, prepared)
+}
+
+func (s *Server) preparePayload(data any) ([]byte, error) {
+	switch v := data.(type) {
+	case []byte:
+		return v, nil
+	case string:
+		return []byte(v), nil
+	default:
+		return s.opts.Codec.Marshal(data)
+	}
+}
+
+func (s *Server) prepareBroadcastMessage(data any) ([]byte, *websocket.PreparedMessage, error) {
+	payload, err := s.preparePayload(data)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	prepared, err := websocket.NewPreparedMessage(websocket.BinaryMessage, payload)
+	if err != nil {
+		return payload, nil, nil
+	}
+
+	return payload, prepared, nil
+}
+
+func (s *Server) broadcastParallel(conns []*Connection, payload []byte, prepared *websocket.PreparedMessage) error {
+	if len(conns) == 0 {
+		return nil
+	}
+
+	workers := broadcastWorkerCount(len(conns))
+
+	chunkSize := (len(conns) + workers - 1) / workers
+	errCh := make(chan error, workers)
+	var wg sync.WaitGroup
+
+	for start := 0; start < len(conns); start += chunkSize {
+		end := start + chunkSize
+		if end > len(conns) {
+			end = len(conns)
+		}
+		part := conns[start:end]
+		wg.Add(1)
+		go func(part []*Connection) {
+			defer wg.Done()
+			var lastErr error
+			for _, conn := range part {
+				if err := sendBroadcastMessage(conn, payload, prepared, s.opts); err != nil {
+					lastErr = err
+				}
+			}
+			if lastErr != nil {
+				errCh <- lastErr
+			}
+		}(part)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	var lastErr error
+	for err := range errCh {
+		if err != nil {
 			lastErr = err
 		}
 	}
 	return lastErr
 }
 
-// OnConnect 设置连接处理器
+func broadcastWorkerCount(connectionCount int) int {
+	if connectionCount <= 1 {
+		return connectionCount
+	}
+
+	workers := runtime.GOMAXPROCS(0) * 4
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > connectionCount {
+		workers = connectionCount
+	}
+	return workers
+}
+
+func sendBroadcastMessage(conn *Connection, payload []byte, prepared *websocket.PreparedMessage, opts Options) error {
+	message := outboundMessage{
+		data:        payload,
+		prepared:    prepared,
+		messageType: websocket.BinaryMessage,
+	}
+	if err := conn.enqueueBroadcast(message, false); err != nil {
+		return err
+	}
+	return conn.tryServeWriterInline(opts)
+}
+
+// OnConnect sets the connect handler.
 func (s *Server) OnConnect(handler func(*Connection)) {
 	s.onConnect = handler
 }
 
-// OnDisconnect 设置断开处理器
+// OnDisconnect sets the disconnect handler.
 func (s *Server) OnDisconnect(handler func(*Connection)) {
 	s.onDisconnect = handler
 }
 
-// OnMessage 设置消息处理器
+// OnMessage sets the message handler.
 func (s *Server) OnMessage(handler MessageHandler) {
 	s.messageHandler = handler
 }
 
-// ConnectionCount 返回连接数
+// ConnectionCount returns the number of active connections.
 func (s *Server) ConnectionCount() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return len(s.connections)
+	return int(s.activeCount.Load())
+}
+
+func (s *Server) tryAcquireConnectionSlot() bool {
+	maxConnections := s.opts.MaxConnections
+	if maxConnections <= 0 {
+		s.activeCount.Add(1)
+		return true
+	}
+
+	for {
+		current := s.activeCount.Load()
+		if current >= int64(maxConnections) {
+			return false
+		}
+		if s.activeCount.CompareAndSwap(current, current+1) {
+			return true
+		}
+	}
+}
+
+func (s *Server) releaseConnectionSlot() {
+	s.activeCount.Add(-1)
+}
+
+func (s *Server) runHeartbeatScheduler() {
+	defer close(s.heartbeatDone)
+	if s.opts.PingInterval <= 0 {
+		<-s.heartbeatStop
+		return
+	}
+
+	interval := s.opts.PingInterval / 4
+	if interval <= 0 {
+		interval = s.opts.PingInterval
+	}
+	if interval > time.Second {
+		interval = time.Second
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s.dispatchHeartbeats(time.Now())
+		case <-s.heartbeatStop:
+			return
+		}
+	}
+}
+
+func (s *Server) dispatchHeartbeats(now time.Time) {
+	conns := s.snapshotConnections()
+	for _, conn := range conns {
+		conn.schedulePing(now, s.opts.PingInterval)
+	}
+}
+
+func (s *Server) snapshotConnections() []*Connection {
+	conns := make([]*Connection, 0, int(s.activeCount.Load()))
+	for idx := range s.connectionSets {
+		shard := &s.connectionSets[idx]
+		shard.mu.RLock()
+		for _, conn := range shard.connections {
+			conns = append(conns, conn)
+		}
+		shard.mu.RUnlock()
+	}
+	return conns
+}
+
+func newConnectionShards() []connectionShard {
+	shards := make([]connectionShard, connectionShardCount)
+	for i := range shards {
+		shards[i].connections = make(map[string]*Connection)
+	}
+	return shards
+}
+
+func (s *Server) connectionShard(id string) *connectionShard {
+	if len(s.connectionSets) == 0 {
+		return nil
+	}
+	hasher := fnv.New32a()
+	_, _ = hasher.Write([]byte(id))
+	index := int(hasher.Sum32() % uint32(len(s.connectionSets)))
+	return &s.connectionSets[index]
+}
+
+func (s *Server) storeConnection(conn *Connection) {
+	shard := s.connectionShard(conn.ID)
+	shard.mu.Lock()
+	shard.connections[conn.ID] = conn
+	shard.mu.Unlock()
+}
+
+func (s *Server) nextConnectionID() string {
+	return strconv.FormatUint(s.nextConnID.Add(1), 36)
 }

@@ -19,57 +19,58 @@ const (
 	Version = "0.3.0"
 )
 
-// App 是 Grodyia 应用的核心，管理所有服务的生命周期
-// 一个 App = 一个 Server，可以绑定多个 Transport (gRPC/HTTP/WebSocket)
+// App is the core Grodyia application and manages service lifecycles.
+// One app can bind multiple transports such as gRPC, HTTP, and WebSocket.
 type App struct {
 	opts Options
 
-	// 核心组件 - 所有服务共享
+	// Shared core components.
 	config   config.Config
 	registry registry.Registry
 	eventBus events.Bus
 	codec    codec.Codec
 
-	// 传输层
+	// Bound transports.
 	transports []Transport
 
-	// 服务信息
+	// Service metadata.
 	serviceInfo *registry.Service
 
-	// 生命周期
+	// Lifecycle.
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// 状态
-	running bool
-	mu      sync.RWMutex
+	// Runtime state.
+	running  bool
+	starting bool
+	mu       sync.RWMutex
 
-	// 钩子
+	// Lifecycle hooks.
 	beforeStart []func(*App) error
 	afterStart  []func(*App) error
 	beforeStop  []func(*App) error
 	afterStop   []func(*App) error
 }
 
-// Transport 传输层接口 (gRPC/HTTP/WebSocket)
+// Transport defines the transport layer interface.
 type Transport interface {
-	// ID 传输层ID
+	// ID returns the transport ID.
 	ID() string
-	// Name 传输层名称
+	// Name returns the transport name.
 	Name() string
-	// Version 传输层版本
+	// Version returns the transport version.
 	Version() string
-	// Metadata 传输层元数据
+	// Metadata returns transport metadata.
 	Metadata() map[string]string
-	// Start 启动 (非阻塞)
+	// Start starts the transport without blocking.
 	Start() error
-	// Stop 停止 (使用内部超时)
+	// Stop stops the transport using its internal timeout.
 	Stop() error
-	// Addr 监听地址
+	// Addr returns the listen address.
 	Addr() string
 }
 
-// New 创建新的应用
+// New creates a new application.
 func New(opts ...Option) *App {
 	options := DefaultOptions()
 	for _, o := range opts {
@@ -86,19 +87,19 @@ func New(opts ...Option) *App {
 		eventBus:   events.NewBus(events.WithAsync(true)),
 	}
 
-	// 设置默认 codec
+	// Set the default codec.
 	if options.Codec != nil {
 		app.codec = options.Codec
 	} else {
 		app.codec = codec.NewJSONCodec()
 	}
 
-	// 设置注册中心
+	// Set the registry.
 	if options.Registry != nil {
 		app.registry = options.Registry
 	}
 
-	// 构建服务信息
+	// Build service metadata.
 	app.serviceInfo = &registry.Service{
 		Name:     options.Name,
 		ID:       options.ID,
@@ -109,75 +110,75 @@ func New(opts ...Option) *App {
 	return app
 }
 
-// Name 返回应用名称
+// Name returns the application name.
 func (a *App) Name() string {
 	return a.opts.Name
 }
 
-// ID 返回应用ID
+// ID returns the application ID.
 func (a *App) ID() string {
 	return a.opts.ID
 }
 
-// Version 返回应用版本
+// Version returns the application version.
 func (a *App) Version() string {
 	return a.opts.Version
 }
 
-// Context 返回应用上下文
+// Context returns the application context.
 func (a *App) Context() context.Context {
 	return a.ctx
 }
 
-// Config 返回配置
+// Config returns the application config.
 func (a *App) Config() config.Config {
 	return a.config
 }
 
-// Registry 返回注册中心
+// Registry returns the service registry.
 func (a *App) Registry() registry.Registry {
 	return a.registry
 }
 
-// EventBus 返回事件总线
+// EventBus returns the event bus.
 func (a *App) EventBus() events.Bus {
 	return a.eventBus
 }
 
-// Codec 返回编解码器
+// Codec returns the codec.
 func (a *App) Codec() codec.Codec {
 	return a.codec
 }
 
-// ServiceInfo 返回服务信息
+// ServiceInfo returns the service metadata.
 func (a *App) ServiceInfo() *registry.Service {
 	return a.serviceInfo
 }
 
-// Options 返回配置选项
+// Options returns the application options.
 func (a *App) Options() Options {
 	return a.opts
 }
 
-// SetConfig 设置配置
+// SetConfig sets the application config.
 func (a *App) SetConfig(cfg config.Config) *App {
 	a.config = cfg
 	return a
 }
 
-// SetRegistry 设置注册中心
+// SetRegistry sets the service registry.
 func (a *App) SetRegistry(reg registry.Registry) *App {
 	a.registry = reg
 	return a
 }
 
-// SetCodec 设置编解码器
+// SetCodec sets the codec.
 func (a *App) SetCodec(c codec.Codec) *App {
 	a.codec = c
 	return a
 }
 
-// Bind 绑定传输层 (gRPC/HTTP/WebSocket)
+// Bind attaches transports to the application.
 func (a *App) Bind(transports ...Transport) *App {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -185,92 +186,117 @@ func (a *App) Bind(transports ...Transport) *App {
 	return a
 }
 
-// BeforeStart 添加启动前钩子
+// BeforeStart adds a hook that runs before startup.
 func (a *App) BeforeStart(fn func(*App) error) *App {
 	a.beforeStart = append(a.beforeStart, fn)
 	return a
 }
 
-// AfterStart 添加启动后钩子
+// AfterStart adds a hook that runs after startup.
 func (a *App) AfterStart(fn func(*App) error) *App {
 	a.afterStart = append(a.afterStart, fn)
 	return a
 }
 
-// BeforeStop 添加停止前钩子
+// BeforeStop adds a hook that runs before shutdown.
 func (a *App) BeforeStop(fn func(*App) error) *App {
 	a.beforeStop = append(a.beforeStop, fn)
 	return a
 }
 
-// AfterStop 添加停止后钩子
+// AfterStop adds a hook that runs after shutdown.
 func (a *App) AfterStop(fn func(*App) error) *App {
 	a.afterStop = append(a.afterStop, fn)
 	return a
 }
 
-// Run 启动应用并阻塞等待信号
+// Run starts the application and blocks until a shutdown signal arrives.
 func (a *App) Run() error {
 	if err := a.Start(); err != nil {
 		panic(err)
 	}
 
-	// 等待信号
+	// Wait for a shutdown signal.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	select {
 	case sig := <-sigCh:
-		logger.Info("Received signal: %v", sig)
+		logger.Info("received signal: %v", sig)
 	case <-a.ctx.Done():
 	}
 
 	return a.Stop()
 }
 
-// Start 启动应用
-func (a *App) Start() error {
+// Start starts the application.
+func (a *App) Start() (err error) {
 	a.mu.Lock()
-	if a.running {
+	if a.running || a.starting {
 		a.mu.Unlock()
 		return nil
 	}
-	a.running = true
+	a.starting = true
 	a.mu.Unlock()
 
-	// 初始化日志
-	logPath := a.opts.LogPath
-	if logPath == "" {
-		logPath = "./logs"
+	startedTransports := make([]Transport, 0, len(a.transports))
+	registryConnected := false
+	defer func() {
+		a.mu.Lock()
+		a.starting = false
+		if err == nil {
+			a.running = true
+			a.mu.Unlock()
+			return
+		}
+		a.running = false
+		a.mu.Unlock()
+
+		for i := len(startedTransports) - 1; i >= 0; i-- {
+			if stopErr := startedTransports[i].Stop(); stopErr != nil {
+				logger.Warning("transport %s rollback error: %v", startedTransports[i].Name(), stopErr)
+			}
+		}
+		if registryConnected && a.registry != nil {
+			if closeErr := a.registry.Close(); closeErr != nil {
+				logger.Warning("registry rollback error: %v", closeErr)
+			}
+		}
+	}()
+
+	// Initialize logging. An empty path keeps file output disabled.
+	if err = logger.New(a.opts.LogPath); err != nil {
+		return fmt.Errorf("logger init error: %w", err)
 	}
-	logger.New(logPath)
 
-	logger.Info("Starting %s v%s (Grodyia %s)", a.opts.Name, a.opts.Version, Version)
+	logger.Info("starting %s v%s (grodyia %s)", a.opts.Name, a.opts.Version, Version)
 
-	// 执行启动前钩子
+	// Run before-start hooks.
 	for _, fn := range a.beforeStart {
-		if err := fn(a); err != nil {
+		if err = fn(a); err != nil {
 			return fmt.Errorf("before start hook error: %w", err)
 		}
 	}
 
-	// 连接注册中心
+	// Connect to the registry.
 	if a.registry != nil {
-		if err := a.registry.Connect(); err != nil {
-			logger.Warning("Registry connect failed: %v", err)
+		if err = a.registry.Connect(); err != nil {
+			logger.Warning("registry connect failed: %v", err)
 		} else {
-			logger.Info("Connected to registry (%s)", a.registry.Type())
+			registryConnected = true
+			logger.Info("connected to registry (%s)", a.registry.Type())
 		}
 	}
 
-	// 启动所有传输层
+	// Start all transports.
 	for _, t := range a.transports {
-		if err := t.Start(); err != nil {
+		if err = t.Start(); err != nil {
 			return fmt.Errorf("transport %s start error: %w", t.Name(), err)
 		}
-		logger.Info("Transport %s listening on %s", t.Name(), t.Addr())
+		startedTransports = append(startedTransports, t)
+		logger.Info("transport %s listening on %s", t.Name(), t.Addr())
 
-		// 注册到注册中心
+		// Register the transport.
 		if a.registry != nil {
 			svc := &registry.Service{
 				ID:       t.ID(),
@@ -279,38 +305,40 @@ func (a *App) Start() error {
 				Address:  t.Addr(),
 				Metadata: t.Metadata(),
 			}
-			if err := a.registry.Register(svc); err != nil {
-				logger.Warning("Registry register failed: %v", err)
+			if err = a.registry.Register(svc); err != nil {
+				logger.Warning("registry register failed: %v", err)
 			}
 		}
 	}
 
-	// Watcher
+	// Start the registry watcher.
 	if a.registry != nil {
-		if _, err := a.registry.Watch(); err != nil {
-			logger.Warning("Registry watch failed: %v", err)
+		if _, err = a.registry.Watch(); err != nil {
+			logger.Warning("registry watch failed: %v", err)
 		}
 	}
 
-	// 发布启动事件
-	a.eventBus.Publish(a.ctx, "app.started", map[string]any{
+	// Publish the startup event.
+	if err = a.eventBus.Publish(a.ctx, "app.started", map[string]any{
 		"name":    a.opts.Name,
 		"id":      a.opts.ID,
 		"version": a.opts.Version,
-	})
+	}); err != nil {
+		return fmt.Errorf("publish start event error: %w", err)
+	}
 
-	// 执行启动后钩子
+	// Run after-start hooks.
 	for _, fn := range a.afterStart {
 		if err := fn(a); err != nil {
-			logger.Warning("After start hook error: %v", err)
+			logger.Warning("after start hook error: %v", err)
 		}
 	}
 
-	logger.Info("Application started successfully")
+	logger.Info("application started successfully")
 	return nil
 }
 
-// Stop 停止应用
+// Stop stops the application.
 func (a *App) Stop() error {
 	a.mu.Lock()
 	if !a.running {
@@ -320,61 +348,61 @@ func (a *App) Stop() error {
 	a.running = false
 	a.mu.Unlock()
 
-	logger.Info("Stopping application...")
+	logger.Info("stopping application...")
 
-	// 取消应用上下文，通知所有监听 ctx.Done() 的组件
+	// Cancel the app context and notify listeners.
 	a.cancel()
 
-	// 执行停止前钩子
+	// Run before-stop hooks.
 	for _, fn := range a.beforeStop {
 		if err := fn(a); err != nil {
-			logger.Warning("Before stop hook error: %v", err)
+			logger.Warning("before stop hook error: %v", err)
 		}
 	}
 
-	// 关闭注册中心
+	// Close the registry.
 	if a.registry != nil {
 		if err := a.registry.Close(); err != nil {
-			logger.Warning("Registry close error: %v", err)
+			logger.Warning("registry close error: %v", err)
 		}
 	}
 
-	// 停止所有传输层
+	// Stop all transports.
 	var lastErr error
 	for _, t := range a.transports {
 		if err := t.Stop(); err != nil {
 			lastErr = err
-			logger.Warning("Transport %s stop error: %v", t.Name(), err)
+			logger.Warning("transport %s stop error: %v", t.Name(), err)
 		}
 	}
 
-	// 关闭事件总线
+	// Close the event bus.
 	if err := a.eventBus.Close(); err != nil {
-		logger.Warning("EventBus close error: %v", err)
+		logger.Warning("event bus close error: %v", err)
 	}
 
-	// 执行停止后钩子
+	// Run after-stop hooks.
 	for _, fn := range a.afterStop {
 		if err := fn(a); err != nil {
-			logger.Warning("After stop hook error: %v", err)
+			logger.Warning("after stop hook error: %v", err)
 		}
 	}
 
-	logger.Info("Application stopped")
+	logger.Info("application stopped")
 	return lastErr
 }
 
-// Publish 发布事件
+// Publish publishes an event.
 func (a *App) Publish(topic string, data any) error {
 	return a.eventBus.Publish(a.ctx, topic, data)
 }
 
-// Subscribe 订阅事件
+// Subscribe subscribes to an event topic.
 func (a *App) Subscribe(topic string, handler events.Handler) (events.Subscription, error) {
 	return a.eventBus.Subscribe(topic, handler)
 }
 
-// IsRunning 是否正在运行
+// IsRunning reports whether the application is running.
 func (a *App) IsRunning() bool {
 	a.mu.RLock()
 	defer a.mu.RUnlock()

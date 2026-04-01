@@ -3,6 +3,8 @@ package middleware
 import (
 	"net/http"
 	"time"
+
+	"github.com/mteznja4ma/grodyia/logger"
 )
 
 // HTTPRateLimiter returns an HTTP middleware for rate limiting
@@ -121,6 +123,7 @@ func Recovery() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if err := recover(); err != nil {
+					logger.Error("http panic recovered: %v", err)
 					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				}
 			}()

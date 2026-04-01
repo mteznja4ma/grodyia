@@ -104,7 +104,7 @@ func (r *nacosRegistry) Connect() error {
 	r.client = client
 	r.running = true
 
-	logger.Info("Connected to Nacos at %v", r.opts.Addresses)
+	logger.Info("connected to nacos at %v", r.opts.Addresses)
 	return nil
 }
 
@@ -117,7 +117,7 @@ func (r *nacosRegistry) Close() error {
 
 	r.running = false
 
-	// 复制数据，避免持有锁时执行阻塞操作
+	// Copy data before releasing the lock to avoid blocking while locked.
 	registered := make([]*Service, len(r.registered))
 	copy(registered, r.registered)
 	r.registered = nil
@@ -131,12 +131,12 @@ func (r *nacosRegistry) Close() error {
 	client := r.client
 	r.mu.Unlock()
 
-	// 注销服务
+	// Deregister services.
 	for _, s := range registered {
 		r.deregisterInstance(s)
 	}
 
-	// 停止 watchers (需要 Unsubscribe)
+	// Stop watchers and unsubscribe when needed.
 	for _, w := range watchers {
 		if w.subscribed && client != nil && w.service != "" {
 			client.Unsubscribe(&vo.SubscribeParam{
@@ -203,7 +203,7 @@ func (r *nacosRegistry) Register(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Create, Service: s, Timestamp: time.Now()})
-	logger.Info("Registered service: %s/%s @ %s", s.Name, s.ID, s.Address)
+	logger.Info("registered service: %s/%s @ %s", s.Name, s.ID, s.Address)
 	return nil
 }
 
@@ -249,7 +249,7 @@ func (r *nacosRegistry) Deregister(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Delete, Service: s, Timestamp: time.Now()})
-	logger.Info("Deregistered service: %s/%s", s.Name, s.ID)
+	logger.Info("deregistered service: %s/%s", s.Name, s.ID)
 	return nil
 }
 
@@ -358,7 +358,7 @@ func (r *nacosRegistry) Watch() (Watcher, error) {
 					select {
 					case w.events <- event:
 					default:
-						logger.Warning("Watcher event channel full, dropping update for service: %s", s.Name)
+						logger.Warning("watcher event channel full, dropping update for service: %s", s.Name)
 					}
 				}
 			},
@@ -378,7 +378,7 @@ func (r *nacosRegistry) notify(event *Event) {
 			select {
 			case w.events <- event:
 			default:
-				logger.Warning("Watcher event channel full, dropping event for service: %s", event.Service.Name)
+				logger.Warning("watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}

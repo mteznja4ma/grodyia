@@ -17,10 +17,10 @@ import (
 	"github.com/mteznja4ma/grodyia/logger"
 )
 
-// RegisterFn 注册函数
+// RegisterFn registers services on the gRPC server.
 type RegisterFn func(*grpc.Server)
 
-// Server 是 gRPC 服务器，实现 grodyia.Transport 接口
+// Server implements the Grodyia transport interface for gRPC.
 type Server struct {
 	*baseRpcService
 	healthStatus health.Health
@@ -29,7 +29,7 @@ type Server struct {
 	addr         string
 }
 
-// NewServer 创建新的 gRPC 服务器
+// NewServer creates a new gRPC server.
 func NewServer(opts ...Option) *Server {
 	options := DefaultOptions()
 	for _, o := range opts {
@@ -43,38 +43,38 @@ func NewServer(opts ...Option) *Server {
 	}
 }
 
-// ID 返回传输层ID
+// ID returns the transport ID.
 func (s *Server) ID() string {
 	return s.baseRpcService.options.ID
 }
 
-// Metadata 返回传输层元数据
+// Metadata returns transport metadata.
 func (s *Server) Metadata() map[string]string {
 	return s.baseRpcService.options.Metadata
 }
 
-// Version 返回传输层版本
+// Version returns the transport version.
 func (s *Server) Version() string {
 	return s.baseRpcService.options.Version
 }
 
-// Name 返回传输层名称
+// Name returns the transport name.
 func (s *Server) Name() string {
 	return s.baseRpcService.options.Name
 }
 
-// Addr 返回监听地址
+// Addr returns the listen address.
 func (s *Server) Addr() string {
 	return s.addr
 }
 
-// Register 注册 gRPC 服务
+// Register configures gRPC service registration.
 func (s *Server) Register(fn RegisterFn) *Server {
 	s.registerFn = fn
 	return s
 }
 
-// Start 启动服务器 (非阻塞)
+// Start starts the server without blocking.
 func (s *Server) Start() error {
 	ln, err := net.Listen("tcp", s.options.Address)
 	if err != nil {
@@ -82,30 +82,30 @@ func (s *Server) Start() error {
 	}
 	s.listener = ln
 
-	// 构建拦截器
+	// Build interceptors.
 	unaryInterceptorOption := grpc.ChainUnaryInterceptor(s.buildUnaryInterceptors()...)
 	streamInterceptorOption := grpc.ChainStreamInterceptor(s.buildStreamInterceptors()...)
 
 	serverOpts := append(s.options.GrpcOptions, unaryInterceptorOption, streamInterceptorOption)
 
-	// 添加 TLS 配置
+	// Add TLS configuration.
 	if s.options.TLSCert != "" && s.options.TLSKey != "" {
 		creds, err := s.loadTLSCredentials()
 		if err != nil {
 			return fmt.Errorf("failed to load TLS credentials: %w", err)
 		}
 		serverOpts = append(serverOpts, grpc.Creds(creds))
-		logger.Info("TLS enabled for gRPC server")
+		logger.Info("tls enabled for grpc server")
 	}
 
 	s.server = grpc.NewServer(serverOpts...)
 
-	// 注册用户服务
+	// Register user services.
 	if s.registerFn != nil {
 		s.registerFn(s.server)
 	}
 
-	// 注册健康检查
+	// Register health checks.
 	if s.health != nil {
 		grpc_health_v1.RegisterHealthServer(s.server, s.health)
 		s.health.Resume()
@@ -114,15 +114,15 @@ func (s *Server) Start() error {
 	s.healthStatus.SetReady()
 	health.AddHealthState(s.healthStatus)
 
-	// 非阻塞启动
+	// Start serving in the background.
 	go func() {
 		if s.options.TLSCert != "" {
-			logger.Info("gRPC server starting on %s (TLS)", s.options.Address)
+			logger.Info("grpc server starting on %s (tls)", s.options.Address)
 		} else {
-			logger.Info("gRPC server starting on %s", s.options.Address)
+			logger.Info("grpc server starting on %s", s.options.Address)
 		}
 		if err := s.server.Serve(ln); err != nil {
-			logger.Error("Server error: %v", err)
+			logger.Error("server error: %v", err)
 		}
 	}()
 
@@ -131,7 +131,7 @@ func (s *Server) Start() error {
 
 // loadTLSCredentials loads TLS credentials for the server
 func (s *Server) loadTLSCredentials() (credentials.TransportCredentials, error) {
-	// Load server certificate and key
+	// Load the server certificate and key.
 	serverCert, err := tls.LoadX509KeyPair(s.options.TLSCert, s.options.TLSKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load server cert: %w", err)
@@ -142,7 +142,7 @@ func (s *Server) loadTLSCredentials() (credentials.TransportCredentials, error) 
 		ClientAuth:   tls.NoClientCert,
 	}
 
-	// Load CA certificate for mutual TLS
+	// Load the CA certificate for mutual TLS.
 	if s.options.TLSMutual && s.options.TLSCACert != "" {
 		caCert, err := os.ReadFile(s.options.TLSCACert)
 		if err != nil {
@@ -156,19 +156,19 @@ func (s *Server) loadTLSCredentials() (credentials.TransportCredentials, error) 
 
 		tlsConfig.ClientCAs = certPool
 		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		logger.Info("Mutual TLS enabled")
+		logger.Info("mutual tls enabled")
 	}
 
 	return credentials.NewTLS(tlsConfig), nil
 }
 
-// Stop 停止服务器 (使用内部 StopTimeout)
+// Stop stops the server using its internal stop timeout.
 func (s *Server) Stop() error {
 	if s.server == nil {
 		return nil
 	}
 
-	logger.Info("gRPC server stopping...")
+	logger.Info("grpc server stopping...")
 	s.healthStatus.SetNoReady()
 
 	done := make(chan struct{})
@@ -179,16 +179,16 @@ func (s *Server) Stop() error {
 
 	select {
 	case <-done:
-		logger.Info("gRPC server stopped gracefully")
+		logger.Info("grpc server stopped gracefully")
 	case <-time.After(time.Second * 10):
-		logger.Warning("gRPC server force stopping due to timeout")
+		logger.Warning("grpc server force stopping due to timeout")
 		s.server.Stop()
 	}
 
 	return nil
 }
 
-// Server 返回底层 grpc.Server
+// Server returns the underlying gRPC server.
 func (s *Server) Server() *grpc.Server {
 	return s.server
 }
@@ -212,7 +212,7 @@ func (s *Server) recoveryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("Panic recovered: %v", r)
+				logger.Error("panic recovered: %v", r)
 				err = fmt.Errorf("internal error")
 			}
 		}()
@@ -238,7 +238,7 @@ func (s *Server) streamRecoveryInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("Stream panic recovered: %v", r)
+				logger.Error("stream panic recovered: %v", r)
 				err = fmt.Errorf("internal error")
 			}
 		}()

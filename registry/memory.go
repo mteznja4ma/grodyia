@@ -7,6 +7,8 @@ import (
 	"github.com/mteznja4ma/grodyia/logger"
 )
 
+const memoryWatcherBufferSize = 1024
+
 // memoryRegistry is an in-memory implementation
 type memoryRegistry struct {
 	opts     Options
@@ -75,7 +77,7 @@ func (r *memoryRegistry) Close() error {
 	r.services = make(map[string][]*Service)
 	r.mu.Unlock()
 
-	// 停止 watchers
+	// Stop watchers.
 	for _, w := range watchers {
 		w.once.Do(func() { close(w.done) })
 	}
@@ -85,26 +87,30 @@ func (r *memoryRegistry) Close() error {
 
 func (r *memoryRegistry) Register(s *Service) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	s.LastSeen = time.Now()
 	s.Healthy = true
 
 	services := r.services[s.Name]
 	found := false
+	var event *Event
 
 	for i, svc := range services {
 		if svc.ID == s.ID {
 			services[i] = s
 			found = true
-			r.notify(&Event{Type: Update, Service: s, Timestamp: time.Now()})
+			event = &Event{Type: Update, Service: s, Timestamp: time.Now()}
 			break
 		}
 	}
 
 	if !found {
 		r.services[s.Name] = append(services, s)
-		r.notify(&Event{Type: Create, Service: s, Timestamp: time.Now()})
+		event = &Event{Type: Create, Service: s, Timestamp: time.Now()}
+	}
+	r.mu.Unlock()
+
+	if event != nil {
+		r.notify(event)
 	}
 
 	return nil
@@ -112,15 +118,19 @@ func (r *memoryRegistry) Register(s *Service) error {
 
 func (r *memoryRegistry) Deregister(s *Service) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	services := r.services[s.Name]
+	var event *Event
 	for i, svc := range services {
 		if svc.ID == s.ID {
 			r.services[s.Name] = append(services[:i], services[i+1:]...)
-			r.notify(&Event{Type: Delete, Service: s, Timestamp: time.Now()})
+			event = &Event{Type: Delete, Service: s, Timestamp: time.Now()}
 			break
 		}
+	}
+	r.mu.Unlock()
+
+	if event != nil {
+		r.notify(event)
 	}
 
 	return nil
@@ -176,7 +186,7 @@ func (r *memoryRegistry) Watch() (Watcher, error) {
 	r.nextID++
 	w := &memoryWatcher{
 		id:      r.nextID,
-		events:  make(chan *Event, 100),
+		events:  make(chan *Event, memoryWatcherBufferSize),
 		done:    make(chan struct{}),
 		service: r.opts.WatcherOption.Service,
 		r:       r,
@@ -187,12 +197,13 @@ func (r *memoryRegistry) Watch() (Watcher, error) {
 }
 
 func (r *memoryRegistry) notify(event *Event) {
-	for _, w := range r.watchers {
+	watchers := r.snapshotWatchers(event.Service.Name)
+	for _, w := range watchers {
 		if w.service == "" || w.service == event.Service.Name {
 			select {
 			case w.events <- event:
 			default:
-				logger.Warning("Watcher event channel full, dropping event for service: %s", event.Service.Name)
+				logger.Warning("watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}
@@ -212,13 +223,14 @@ func (r *memoryRegistry) cleanup() {
 			}
 			r.mu.Lock()
 			now := time.Now()
+			expiredEvents := make([]*Event, 0)
 			for name, services := range r.services {
 				active := make([]*Service, 0)
 				for _, s := range services {
 					if s.TTL == 0 || now.Sub(s.LastSeen) < s.TTL {
 						active = append(active, s)
 					} else {
-						r.notify(&Event{Type: Delete, Service: s, Timestamp: now})
+						expiredEvents = append(expiredEvents, &Event{Type: Delete, Service: s, Timestamp: now})
 					}
 				}
 				if len(active) > 0 {
@@ -228,8 +240,24 @@ func (r *memoryRegistry) cleanup() {
 				}
 			}
 			r.mu.Unlock()
+			for _, event := range expiredEvents {
+				r.notify(event)
+			}
 		}
 	}
+}
+
+func (r *memoryRegistry) snapshotWatchers(service string) []*memoryWatcher {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	watchers := make([]*memoryWatcher, 0, len(r.watchers))
+	for _, w := range r.watchers {
+		if w.service == "" || w.service == service {
+			watchers = append(watchers, w)
+		}
+	}
+	return watchers
 }
 
 // memoryWatcher is an in-memory watcher implementation

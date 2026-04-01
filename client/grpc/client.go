@@ -81,7 +81,7 @@ func (c *client) connect() error {
 	}
 
 	c.conn = conn
-	logger.Info("Connected to %s", c.opts.Address)
+	logger.Info("connected to %s", c.opts.Address)
 	return nil
 }
 
@@ -95,7 +95,7 @@ func (c *client) buildDialOptions() []grpc.DialOption {
 		// Load TLS credentials
 		creds, err := c.loadTLSCredentials()
 		if err != nil {
-			logger.Warning("Failed to load TLS credentials, falling back to insecure: %v", err)
+			logger.Warning("failed to load tls credentials, falling back to insecure: %v", err)
 			opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		} else {
 			opts = append(opts, grpc.WithTransportCredentials(creds))
@@ -174,7 +174,7 @@ func (c *client) Close() error {
 	defer c.mu.Unlock()
 
 	if c.conn != nil {
-		logger.Info("Closing connection to %s", c.opts.Address)
+		logger.Info("closing connection to %s", c.opts.Address)
 		return c.conn.Close()
 	}
 	return nil
@@ -232,16 +232,16 @@ func (c *client) connectionMonitor() {
 
 			if conn == nil {
 				if err := c.Reconnect(); err != nil {
-					logger.Warning("Reconnect failed: %v", err)
+					logger.Warning("reconnect failed: %v", err)
 				}
 				continue
 			}
 
 			state := conn.GetState()
 			if state == connectivity.TransientFailure || state == connectivity.Shutdown {
-				logger.Warning("Connection state: %s, attempting reconnect...", state)
+				logger.Warning("connection state: %s, attempting reconnect...", state)
 				if err := c.Reconnect(); err != nil {
-					logger.Warning("Reconnect failed: %v", err)
+					logger.Warning("reconnect failed: %v", err)
 				}
 			}
 		}

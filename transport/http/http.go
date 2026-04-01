@@ -10,7 +10,7 @@ import (
 	"github.com/mteznja4ma/grodyia/logger"
 )
 
-// Server 是 HTTP 服务器，实现 grodyia.Transport 接口
+// Server implements the Grodyia transport interface for HTTP.
 type Server struct {
 	opts         Options
 	router       *Router
@@ -19,7 +19,7 @@ type Server struct {
 	addr         string
 }
 
-// NewServer 创建新的 HTTP 服务器
+// NewServer creates a new HTTP server.
 func NewServer(opts ...Option) *Server {
 	options := DefaultOptions()
 	for _, o := range opts {
@@ -36,39 +36,39 @@ func NewServer(opts ...Option) *Server {
 	}
 }
 
-// ID 返回传输层ID
+// ID returns the transport ID.
 func (s *Server) ID() string {
 	return s.opts.ID
 }
 
-// Metadata 返回传输层元数据
+// Metadata returns transport metadata.
 func (s *Server) Metadata() map[string]string {
 	return s.opts.Metadata
 }
 
-// Name 返回传输层名称
+// Name returns the transport name.
 func (s *Server) Name() string {
 	return s.opts.Name
 }
 
-// Version 返回传输层版本
+// Version returns the transport version.
 func (s *Server) Version() string {
 	return s.opts.Version
 }
 
-// Addr 返回监听地址
+// Addr returns the listen address.
 func (s *Server) Addr() string {
 	return s.addr
 }
 
-// Router 返回路由器
+// Router returns the HTTP router.
 func (s *Server) Router() *Router {
 	return s.router
 }
 
-// Start 启动服务器 (非阻塞)
+// Start starts the server without blocking.
 func (s *Server) Start() error {
-	// 注册健康检查端点
+	// Register the health check endpoint.
 	s.router.GET("/health", func(c *Context) error {
 		if s.healthStatus.IsReady() {
 			return c.JSON(200, map[string]string{"status": "ok"})
@@ -87,9 +87,9 @@ func (s *Server) Start() error {
 	s.healthStatus.SetReady()
 	health.AddHealthState(s.healthStatus)
 
-	// 非阻塞启动
+	// Start serving in the background.
 	go func() {
-		logger.Info("HTTP server starting on %s", s.opts.Address)
+		logger.Info("http server starting on %s", s.opts.Address)
 		var err error
 		if s.opts.TLSCert != "" && s.opts.TLSKey != "" {
 			err = s.server.ListenAndServeTLS(s.opts.TLSCert, s.opts.TLSKey)
@@ -97,30 +97,30 @@ func (s *Server) Start() error {
 			err = s.server.ListenAndServe()
 		}
 		if err != nil && err != http.ErrServerClosed {
-			logger.Error("Server error: %v", err)
+			logger.Error("server error: %v", err)
 		}
 	}()
 
 	return nil
 }
 
-// Stop 停止服务器
+// Stop stops the server.
 func (s *Server) Stop() error {
 	if s.server == nil {
 		return nil
 	}
 
-	logger.Info("HTTP server stopping...")
+	logger.Info("http server stopping...")
 	s.healthStatus.SetNoReady()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
 	if err := s.server.Shutdown(ctx); err != nil {
-		logger.Warning("HTTP server shutdown timeout, forcing close: %v", err)
+		logger.Warning("http server shutdown timeout, forcing close: %v", err)
 		return s.server.Close()
 	}
-	logger.Info("HTTP server stopped gracefully")
+	logger.Info("http server stopped gracefully")
 
 	return nil
 }

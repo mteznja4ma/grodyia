@@ -16,8 +16,14 @@ type Router struct {
 type route struct {
 	method  string
 	pattern string
-	parts   []string
+	parts   []routePart
 	handler HandlerFunc
+}
+
+type routePart struct {
+	value     string
+	paramName string
+	isParam   bool
 }
 
 // NewRouter creates a new router
@@ -66,7 +72,18 @@ func (r *Router) PATCH(pattern string, h HandlerFunc) {
 }
 
 func (r *Router) registerRoute(method, pattern string, h HandlerFunc) {
-	parts := strings.Split(strings.Trim(pattern, "/"), "/")
+	rawParts := strings.Split(strings.Trim(pattern, "/"), "/")
+	parts := make([]routePart, len(rawParts))
+	for i, part := range rawParts {
+		if strings.HasPrefix(part, ":") {
+			parts[i] = routePart{
+				paramName: strings.TrimPrefix(part, ":"),
+				isParam:   true,
+			}
+			continue
+		}
+		parts[i] = routePart{value: part}
+	}
 	rt := route{
 		method:  method,
 		pattern: pattern,
@@ -88,15 +105,16 @@ func (r *Router) matchRoute(method, path string) (*route, map[string]string) {
 			continue
 		}
 
-		params := make(map[string]string)
+		var params map[string]string
 		matched := true
 
 		for i, part := range rt.parts {
-			if strings.HasPrefix(part, ":") {
-				// Path parameter
-				paramName := strings.TrimPrefix(part, ":")
-				params[paramName] = pathParts[i]
-			} else if part != pathParts[i] {
+			if part.isParam {
+				if params == nil {
+					params = make(map[string]string, 2)
+				}
+				params[part.paramName] = pathParts[i]
+			} else if part.value != pathParts[i] {
 				matched = false
 				break
 			}
@@ -116,6 +134,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	rt, params := r.matchRoute(req.Method, req.URL.Path)
 	if rt != nil {
 		ctx := NewContext(w, req, r.opts.Codec)
+		defer releaseContext(ctx)
 		for k, v := range params {
 			ctx.SetParam(k, v)
 		}

@@ -8,11 +8,7 @@ import (
 	"strings"
 )
 
-/**
- * 获取当前系统路径
- *
- * @return (string)
- **/
+// GetCurrentPath returns the current executable directory.
 func GetCurrentPath() (string, error) {
 	file, err := exec.LookPath(os.Args[0])
 	if err != nil {

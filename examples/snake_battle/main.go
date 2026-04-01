@@ -66,7 +66,7 @@ func NewGameServer(wsServer *ws.Server) *GameServer {
 }
 
 func (gs *GameServer) onConnect(conn *ws.Connection) {
-	logger.Info("Player connected: %s", conn.ID)
+	logger.Info("player connected: %s", conn.ID)
 
 	// 创建玩家
 	player := &Player{
@@ -88,7 +88,7 @@ func (gs *GameServer) onConnect(conn *ws.Connection) {
 }
 
 func (gs *GameServer) onDisconnect(conn *ws.Connection) {
-	logger.Info("Player disconnected: %s", conn.ID)
+	logger.Info("player disconnected: %s", conn.ID)
 
 	gs.mu.Lock()
 	player, ok := gs.players[conn.ID]
@@ -134,7 +134,7 @@ func (gs *GameServer) handleJoin(player *Player, conn *ws.Connection, data any) 
 	if room == nil {
 		roomID := uuid.New().String()[:8]
 		room = gs.roomManager.CreateRoom(roomID)
-		logger.Info("Created room: %s", roomID)
+		logger.Info("created room: %s", roomID)
 	}
 
 	if !room.AddPlayer(player.ID) {
@@ -142,7 +142,7 @@ func (gs *GameServer) handleJoin(player *Player, conn *ws.Connection, data any) 
 	}
 
 	player.RoomID = room.ID
-	logger.Info("Player %s joined room %s", player.ID, room.ID)
+	logger.Info("player %s joined room %s", player.ID, room.ID)
 
 	// 设置回调
 	room.OnUpdate(func(r *game.Room) {
@@ -174,7 +174,7 @@ func (gs *GameServer) handleJoin(player *Player, conn *ws.Connection, data any) 
 
 	// 如果房间满了，开始游戏
 	if room.IsFull() {
-		logger.Info("Room %s is full, starting game", room.ID)
+		logger.Info("room %s is full, starting game", room.ID)
 		gs.broadcastToRoom(room, Message{
 			Type: MsgGameStart,
 			Data: map[string]any{
@@ -244,12 +244,12 @@ func (gs *GameServer) leaveRoom(player *Player) {
 	}
 
 	room.RemovePlayer(player.ID)
-	logger.Info("Player %s left room %s", player.ID, player.RoomID)
+	logger.Info("player %s left room %s", player.ID, player.RoomID)
 
 	// 如果房间空了，删除房间
 	if room.PlayerCount() == 0 {
 		gs.roomManager.RemoveRoom(room.ID)
-		logger.Info("Room %s removed", room.ID)
+		logger.Info("room %s removed", room.ID)
 	} else {
 		// 通知其他玩家
 		gs.broadcastToRoom(room, Message{
@@ -311,11 +311,11 @@ func (gs *GameServer) sendError(conn *ws.Connection, errMsg string) error {
 func (gs *GameServer) Stop() {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("Panic during game server stop: %v", r)
+			logger.Error("panic during game server stop: %v", r)
 		}
 	}()
 	gs.roomManager.Stop()
-	logger.Info("Game server stopped")
+	logger.Info("game server stopped")
 }
 
 func main() {
@@ -337,7 +337,7 @@ func main() {
 	})
 
 	go func() {
-		logger.Info("Static server on http://localhost:8086")
+		logger.Info("static server on http://localhost:8086")
 		http.ListenAndServe(":8086", nil)
 	}()
 
@@ -348,7 +348,7 @@ func main() {
 	)
 
 	app.BeforeStop(func(a *grodyia.App) error {
-		logger.Info("Stopping game server")
+		logger.Info("stopping game server")
 		game.Stop()
 		return nil
 	})

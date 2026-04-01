@@ -97,7 +97,7 @@ func (r *etcdRegistry) Connect() error {
 	r.client = client
 	r.running = true
 
-	logger.Info("Connected to etcd at %v", r.opts.Addresses)
+	logger.Info("connected to etcd at %v", r.opts.Addresses)
 	return nil
 }
 
@@ -111,25 +111,25 @@ func (r *etcdRegistry) Close() error {
 	r.running = false
 	close(r.stopCh)
 
-	// 复制需要操作的数据
+	// Copy data before releasing the lock.
 	registered := make(map[string]clientv3.LeaseID)
 	for k, v := range r.registered {
 		registered[k] = v
 	}
 	r.registered = make(map[string]clientv3.LeaseID)
-	r.watchers = make(map[int]*etcdWatcher) // watchers 会通过 stopCh 自动退出
+	r.watchers = make(map[int]*etcdWatcher) // Watchers exit automatically when stopCh closes.
 
 	client := r.client
 	r.mu.Unlock()
 
-	// 使用带超时的 context 撤销租约
+	// Revoke leases with a timeout-bound context.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	for key, leaseID := range registered {
 		if _, err := client.Revoke(ctx, leaseID); err != nil {
-			logger.Warning("Failed to revoke lease for %s: %v", key, err)
-		} 
+			logger.Warning("failed to revoke lease for %s: %v", key, err)
+		}
 	}
 
 	if client != nil {
@@ -184,11 +184,11 @@ func (r *etcdRegistry) Register(s *Service) error {
 				return
 			case ka, ok := <-keepAliveCh:
 				if !ok {
-					logger.Warning("Keep alive channel closed for %s", key)
+					logger.Warning("keep alive channel closed for %s", key)
 					return
 				}
 				if ka == nil {
-					logger.Warning("Keep alive response nil for %s", key)
+					logger.Warning("keep alive response nil for %s", key)
 					return
 				}
 			}
@@ -210,7 +210,7 @@ func (r *etcdRegistry) Register(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Create, Service: s, Timestamp: time.Now()})
-	logger.Info("Registered service: %s/%s", s.Name, s.ID)
+	logger.Info("registered service: %s/%s", s.Name, s.ID)
 	return nil
 }
 
@@ -246,7 +246,7 @@ func (r *etcdRegistry) Deregister(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Delete, Service: s, Timestamp: time.Now()})
-	logger.Info("Deregistered service: %s/%s", s.Name, s.ID)
+	logger.Info("deregistered service: %s/%s", s.Name, s.ID)
 	return nil
 }
 
@@ -347,7 +347,7 @@ func (r *etcdRegistry) notify(event *Event) {
 			select {
 			case w.events <- event:
 			default:
-				logger.Warning("Watcher event channel full, dropping event for service: %s", event.Service.Name)
+				logger.Warning("watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}
@@ -356,11 +356,11 @@ func (r *etcdRegistry) notify(event *Event) {
 type etcdWatcher struct {
 	id      int
 	events  chan *Event
-	done    chan struct{} // 单独停止此 watcher
+	done    chan struct{} // Stops this watcher independently.
 	service string
 	r       *etcdRegistry
 	once    sync.Once
-	// 注：watcher 同时监听 w.done 和 w.r.stopCh，任一关闭都会退出
+	// The watcher listens to both w.done and w.r.stopCh and exits when either closes.
 }
 
 func (w *etcdWatcher) watch() {
@@ -371,7 +371,7 @@ func (w *etcdWatcher) watch() {
 
 	resp, err := w.r.client.Get(tctx, prefix, clientv3.WithPrefix())
 	if err != nil {
-		logger.Error("Failed to get services: %v", err)
+		logger.Error("failed to get services: %v", err)
 		return
 	}
 	for _, kv := range resp.Kvs {
@@ -436,7 +436,7 @@ func (w *etcdWatcher) watch() {
 				select {
 				case w.events <- event:
 				default:
-					logger.Warning("Watcher event channel full, dropping event for service: %s", s.Name)
+					logger.Warning("watcher event channel full, dropping event for service: %s", s.Name)
 				}
 			}
 		}

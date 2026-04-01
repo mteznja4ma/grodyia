@@ -56,9 +56,7 @@ var (
 	}
 )
 
-/**
- * 初始化日志
- **/
+// init starts the background printer.
 func init() {
 	go func() {
 		for {
@@ -83,13 +81,14 @@ func init() {
 	}()
 }
 
-// New
-/*
- * 创建日志文件
- * @param [directory] string
- * @return (error)
- */
+// New initializes the logger and creates the log file.
 func New(directory string) error {
+	if directory == "" {
+		contextLogger = nil
+		logDir = ""
+		return nil
+	}
+
 	contextLogger = logrus.WithFields(logrus.Fields{})
 	logDir = directory
 	logrus.SetFormatter(&logrus.TextFormatter{
@@ -108,16 +107,11 @@ func New(directory string) error {
 		LocalTime:  true,
 	})
 
-	Info("Logger is successfully initialized!")
+	Info("logger initialized successfully")
 	return nil
 }
 
-// SetCallback
-/*
- * 设置日志回调
- * @param [c] func(i LogInfo)
- * @return (error)
- */
+// SetCallback sets the log callback.
 func SetCallback(c func(i Logger)) {
 	if cb != nil && c != nil {
 		return
@@ -134,19 +128,12 @@ func SetCallback(c func(i Logger)) {
 	}
 }
 
-// SetScreenPrint
-/*
- * 日志快照
- * @param [print] int
- */
+// SetScreenPrint toggles screen output.
 func SetScreenPrint(print int) {
 	screenPrint = print
 }
 
-/**
- * 当前时间字符串
- * @return (string)
- **/
+// nowTimeString returns the current timestamp string.
 func nowTimeString() string {
 	now := time.Now()
 	timeStr := fmt.Sprintf("%v-%02d-%02d %02d:%02d:%02d.%09d",
@@ -154,11 +141,7 @@ func nowTimeString() string {
 	return timeStr
 }
 
-// TryE
-/*
- * 日志异常捕捉
- * @param [pathName] string
- */
+// TryE recovers from logging panics and writes a dump file.
 func TryE(pathName string) {
 	errs := recover()
 	if errs == nil {
@@ -180,16 +163,8 @@ func TryE(pathName string) {
 	f.WriteString(string(debug.Stack())) // stack
 }
 
-/**
- * 日志输出
- * @param [file] 文件
- * @param [format] 格式
- * @param [line] 错误行数
- * @param [level] 日志等级
- * @param [a] 参数
- *
- **/
-func printLog(file, format string, line, level int, a ...any) {
+// writeLog formats and writes a log entry.
+func writeLog(file, format string, line, level int, stack string, a ...any) {
 	dir, _ := util.GetCurrentPath()
 	dir = path.Join(dir, "log")
 	if contextLogger != nil {
@@ -200,9 +175,16 @@ func printLog(file, format string, line, level int, a ...any) {
 		return
 	}
 
+	message := fmt.Sprintf(format, a...)
+	shortLocation := fmt.Sprintf("%s:%d", path.Base(file), line)
+	fullLocation := fmt.Sprintf("%s:%d", file, line)
+	logStr := fmt.Sprintf("%s%s[%s] %s", nowTimeString(), GetLogLevelStr(level), shortLocation, message)
+	if stack != "" {
+		logStr += "\n" + stack
+	}
+
 	// merge log
 	if screenPrint != 0 || level >= ErrorLevel || cb == nil {
-		logStr := fmt.Sprintf(nowTimeString()+GetLogLevelStr(level)+format, a...)
 		chanPrint <- Logger{
 			LogStr: logStr,
 			Level:  level,
@@ -211,7 +193,10 @@ func printLog(file, format string, line, level int, a ...any) {
 
 	// save all log
 	if contextLogger != nil {
-		logStr := fmt.Sprintf(nowTimeString()+" "+format, a...) + fmt.Sprintf(" << %s, line #%d ", file, line)
+		logStr := fmt.Sprintf("%s%s[%s] %s", nowTimeString(), GetLogLevelStr(level), fullLocation, message)
+		if stack != "" {
+			logStr += "\n" + stack
+		}
 		switch level {
 		case TraceLevel:
 			logrus.Trace(logStr)
@@ -233,7 +218,7 @@ func printLog(file, format string, line, level int, a ...any) {
 		File:   file,
 		Line:   line,
 		Level:  level,
-		LogStr: fmt.Sprintf(format, a...),
+		LogStr: logStr,
 		TimeNs: time.Now().UnixNano(),
 	}
 	if cb != nil {
@@ -248,80 +233,45 @@ func printLog(file, format string, line, level int, a ...any) {
 	}
 }
 
-// Trace
-/*
- * 追踪级别
- * @param [format] 格式
- * @param [a] 参数
- */
+// Trace logs a trace-level message.
 func Trace(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(file, format, line, TraceLevel, a...)
+	writeLog(file, format, line, TraceLevel, "", a...)
 }
 
-// Debug
-/*
- * 调试级别
- * @param [format] 格式
- * @param [a] 参数
- */
+// Debug logs a debug-level message.
 func Debug(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(file, format, line, DebugLevel, a...)
+	writeLog(file, format, line, DebugLevel, "", a...)
 }
 
-// Info
-/*
- * 正常级别
- * @param [format] 格式
- * @param [a] 参数
- */
+// Info logs an info-level message.
 func Info(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(file, format, line, InfoLevel, a...)
+	writeLog(file, format, line, InfoLevel, "", a...)
 }
 
-// Warning
-/*
- * 警告级别
- * @param [format] 格式
- * @param [a] 参数
- */
+// Warning logs a warning-level message.
 func Warning(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(file, format, line, WarningLevel, a...)
+	writeLog(file, format, line, WarningLevel, "", a...)
 }
 
-// Error
-/*
- * 错误级别
- * @param [format] 格式
- * @param [a] 参数
- */
+// Error logs an error-level message.
 func Error(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(file, format, line, ErrorLevel, a...)
+	writeLog(file, format, line, ErrorLevel, "", a...)
 }
 
-// Fatal
-/*
- * 失败级别
- * @param [format] 格式
- * @param [a] 参数
- */
+// Fatal logs a fatal-level message and exits.
 func Fatal(format string, a ...any) {
 	_, file, line, _ := runtime.Caller(2)
-	printLog(file, format, line, FatalLevel, a...)
+	writeLog(file, format, line, FatalLevel, "", a...)
 	time.Sleep(time.Second / 2)
 	os.Exit(1)
 }
 
-// GetLogLevelStr
-/*
- * 获取日志等级
- * @param [level] int
- * @return (string)
- */
+// GetLogLevelStr returns the formatted log level label.
 func GetLogLevelStr(level int) string {
 	if _, ok := levelName[level]; ok {
 		return levelName[level]

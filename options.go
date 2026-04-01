@@ -7,30 +7,30 @@ import (
 	"github.com/mteznja4ma/grodyia/registry"
 )
 
-// Options 应用配置
+// Options defines application configuration.
 type Options struct {
-	// 服务基本信息
+	// Basic service metadata.
 	ID      string
 	Name    string
 	Version string
 
-	// 元数据
+	// Additional metadata.
 	Metadata map[string]string
 
-	// 注册中心
+	// Service registry.
 	Registry registry.Registry
 
-	// 编解码器
+	// Codec implementation.
 	Codec codec.Codec
 
-	// 日志路径 (为空则不保存到文件)
+	// LogPath is the log directory. An empty value disables file output.
 	LogPath string
 }
 
-// Option 配置函数
+// Option applies configuration to Options.
 type Option func(*Options)
 
-// DefaultOptions 默认配置
+// DefaultOptions returns the default application configuration.
 func DefaultOptions() Options {
 	id := uuid.New().String()[:8]
 	return Options{
@@ -41,28 +41,28 @@ func DefaultOptions() Options {
 	}
 }
 
-// WithName 设置应用名称
+// WithName sets the application name.
 func WithName(name string) Option {
 	return func(o *Options) {
 		o.Name = name
 	}
 }
 
-// WithID 设置应用ID
+// WithID sets the application ID.
 func WithID(id string) Option {
 	return func(o *Options) {
 		o.ID = id
 	}
 }
 
-// WithVersion 设置应用版本
+// WithVersion sets the application version.
 func WithVersion(version string) Option {
 	return func(o *Options) {
 		o.Version = version
 	}
 }
 
-// WithMetadata 设置元数据
+// WithMetadata adds metadata entries.
 func WithMetadata(md map[string]string) Option {
 	return func(o *Options) {
 		for k, v := range md {
@@ -71,21 +71,21 @@ func WithMetadata(md map[string]string) Option {
 	}
 }
 
-// WithRegistry 设置注册中心
+// WithRegistry sets the service registry.
 func WithRegistry(r registry.Registry) Option {
 	return func(o *Options) {
 		o.Registry = r
 	}
 }
 
-// WithCodec 设置编解码器
+// WithCodec sets the codec implementation.
 func WithCodec(c codec.Codec) Option {
 	return func(o *Options) {
 		o.Codec = c
 	}
 }
 
-// WithLogPath 设置日志保存路径
+// WithLogPath sets the log directory path.
 func WithLogPath(path string) Option {
 	return func(o *Options) {
 		o.LogPath = path

@@ -132,7 +132,7 @@ func (r *consulRegistry) Connect() error {
 	// Start health check loop
 	go r.healthCheckLoop()
 
-	logger.Info("Connected to Consul at %s", r.opts.Addresses[0])
+	logger.Info("connected to consul at %s", r.opts.Addresses[0])
 	return nil
 }
 
@@ -146,7 +146,7 @@ func (r *consulRegistry) Close() error {
 	r.running = false
 	close(r.stopCh)
 
-	// 复制数据，避免持有锁时执行阻塞操作
+	// Copy data before releasing the lock to avoid blocking while locked.
 	registered := make([]*Service, len(r.registered))
 	copy(registered, r.registered)
 	r.registered = nil
@@ -155,10 +155,10 @@ func (r *consulRegistry) Close() error {
 	for _, w := range r.watchers {
 		watchers = append(watchers, w)
 	}
-	r.watchers = make(map[int]*consulWatcher) // watchers 会通过 stopCh 自动退出
+	r.watchers = make(map[int]*consulWatcher) // Watchers exit automatically when stopCh closes.
 	r.mu.Unlock()
 
-	// 注销服务
+	// Deregister services.
 	for _, s := range registered {
 		r.deregisterService(s)
 	}
@@ -199,7 +199,7 @@ func (r *consulRegistry) Register(s *Service) error {
 	// Pass initial health check
 	checkID := fmt.Sprintf("service:%s", serviceID)
 	if err := r.client.Agent().PassTTL(checkID, "initial registration"); err != nil {
-		logger.Warning("Failed to pass initial TTL for %s: %v", serviceID, err)
+		logger.Warning("failed to pass initial ttl for %s: %v", serviceID, err)
 	}
 
 	s.LastSeen = time.Now()
@@ -221,7 +221,7 @@ func (r *consulRegistry) Register(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Create, Service: s, Timestamp: time.Now()})
-	logger.Info("Registered service: %s/%s @ %s", s.Name, s.ID, s.Address)
+	logger.Info("registered service: %s/%s @ %s", s.Name, s.ID, s.Address)
 	return nil
 }
 
@@ -258,7 +258,7 @@ func (r *consulRegistry) Deregister(s *Service) error {
 	}
 
 	r.notify(&Event{Type: Delete, Service: s, Timestamp: time.Now()})
-	logger.Info("Deregistered service: %s/%s", s.Name, s.ID)
+	logger.Info("deregistered service: %s/%s", s.Name, s.ID)
 	return nil
 }
 
@@ -378,7 +378,7 @@ func (r *consulRegistry) notify(event *Event) {
 			select {
 			case w.events <- event:
 			default:
-				logger.Warning("Watcher event channel full, dropping event for service: %s", event.Service.Name)
+				logger.Warning("watcher event channel full, dropping event for service: %s", event.Service.Name)
 			}
 		}
 	}
@@ -402,7 +402,7 @@ func (r *consulRegistry) healthCheckLoop() {
 				serviceID := r.serviceID(s.ID)
 				checkID := fmt.Sprintf("service:%s", serviceID)
 				if err := r.client.Agent().PassTTL(checkID, "health check"); err != nil {
-					logger.Warning("Health check failed for %s: %v", serviceID, err)
+					logger.Warning("health check failed for %s: %v", serviceID, err)
 				}
 			}
 		}
@@ -465,7 +465,7 @@ func (w *consulWatcher) watch() {
 				select {
 				case w.events <- event:
 				default:
-					logger.Warning("Watcher event channel full, dropping update for service: %s", s.Name)
+					logger.Warning("watcher event channel full, dropping update for service: %s", s.Name)
 				}
 			}
 		}

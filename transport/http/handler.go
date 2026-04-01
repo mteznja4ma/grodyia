@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/mteznja4ma/grodyia/codec"
 )
@@ -17,15 +18,33 @@ type Context struct {
 	params   map[string]string
 }
 
+var contextPool = sync.Pool{
+	New: func() any {
+		return &Context{
+			params: make(map[string]string, 4),
+		}
+	},
+}
+
 // NewContext creates a new context
 func NewContext(w http.ResponseWriter, r *http.Request, c codec.Codec) *Context {
-	return &Context{
-		Context:  r.Context(),
-		Request:  r,
-		Response: w,
-		codec:    c,
-		params:   make(map[string]string),
+	ctx := contextPool.Get().(*Context)
+	ctx.Context = r.Context()
+	ctx.Request = r
+	ctx.Response = w
+	ctx.codec = c
+	return ctx
+}
+
+func releaseContext(ctx *Context) {
+	for key := range ctx.params {
+		delete(ctx.params, key)
 	}
+	ctx.Context = nil
+	ctx.Request = nil
+	ctx.Response = nil
+	ctx.codec = nil
+	contextPool.Put(ctx)
 }
 
 // Param returns a path parameter
@@ -35,6 +54,9 @@ func (c *Context) Param(key string) string {
 
 // SetParam sets a path parameter
 func (c *Context) SetParam(key, value string) {
+	if c.params == nil {
+		c.params = make(map[string]string, 4)
+	}
 	c.params[key] = value
 }
 
@@ -125,6 +147,7 @@ func WrapHandler(h HandlerFunc, c codec.Codec, middlewares ...Middleware) http.H
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := NewContext(w, r, c)
+		defer releaseContext(ctx)
 		if err := h(ctx); err != nil {
 			ctx.Error(http.StatusInternalServerError, err.Error())
 		}

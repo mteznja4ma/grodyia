@@ -36,6 +36,12 @@ type Options struct {
 	ReadBufferSize int
 	// WriteBufferSize for connection
 	WriteBufferSize int
+	// MaxConnections limits concurrent live WebSocket connections. Zero means unlimited.
+	MaxConnections int
+	// SendQueueSize controls per-connection direct send queue depth.
+	SendQueueSize int
+	// BroadcastQueueSize controls per-connection broadcast queue depth.
+	BroadcastQueueSize int
 
 	// EnableCompression enables per-message compression
 	EnableCompression bool
@@ -56,20 +62,23 @@ type Option func(*Options)
 // DefaultOptions returns sensible defaults
 func DefaultOptions() Options {
 	return Options{
-		ID:                uuid.New().String()[:8],
-		Name:              "ws-service",
-		Address:           ":8080",
-		Path:              "/ws",
-		Codec:             codec.NewJSONCodec(),
-		ReadTimeout:       time.Second * 60,
-		WriteTimeout:      time.Second * 10,
-		PingInterval:      time.Second * 30,
-		PongTimeout:       time.Second * 10,
-		MaxMessageSize:    512 * 1024, // 512KB
-		ReadBufferSize:    1024,
-		WriteBufferSize:   1024,
-		EnableCompression: false,
-		Metadata:          make(map[string]string),
+		ID:                 uuid.New().String()[:8],
+		Name:               "ws-service",
+		Address:            ":8080",
+		Path:               "/ws",
+		Codec:              codec.NewJSONCodec(),
+		ReadTimeout:        time.Second * 60,
+		WriteTimeout:       time.Second * 10,
+		PingInterval:       time.Second * 30,
+		PongTimeout:        time.Second * 10,
+		MaxMessageSize:     512 * 1024, // 512KB
+		ReadBufferSize:     1024,
+		WriteBufferSize:    1024,
+		MaxConnections:     0,
+		SendQueueSize:      64,
+		BroadcastQueueSize: 32,
+		EnableCompression:  false,
+		Metadata:           make(map[string]string),
 	}
 }
 
@@ -132,6 +141,15 @@ func WithBufferSize(read, write int) Option {
 	}
 }
 
+// WithConnectionLimits sets admission and per-connection queue limits.
+func WithConnectionLimits(maxConnections, sendQueueSize, broadcastQueueSize int) Option {
+	return func(o *Options) {
+		o.MaxConnections = maxConnections
+		o.SendQueueSize = sendQueueSize
+		o.BroadcastQueueSize = broadcastQueueSize
+	}
+}
+
 // WithCompression enables compression
 func WithCompression(enabled bool) Option {
 	return func(o *Options) {
@@ -159,4 +177,3 @@ func WithMetadata(md map[string]string) Option {
 		o.Metadata = md
 	}
 }
-
